@@ -25,12 +25,14 @@ Garmin doesn't offer a public API for personal accounts (the official Health API
 
 ## Deploying
 
-Stride is built for one person. Deployed, it needs two things a laptop doesn't:
+Stride is built for one person. Deployed, it needs three things a laptop doesn't:
 
 1. **A database** for your Garmin session, goals and sign-ins waiting for a verification code. Serverless hosts (Vercel, AWS Lambda) have a read-only disk. Stride uses Upstash Redis over its REST API (no extra package). Set either pair:
    - `KV_REST_API_URL` and `KV_REST_API_TOKEN` (added automatically by Vercel's Upstash/Redis integration), or
    - `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
 2. **A password** in front of the whole site: `STRIDE_PASSWORD`. Without it, a deployed Stride stays locked rather than exposing your health data. Use a long, random password; changing it signs every browser out.
+
+3. **Your time zone**: `STRIDE_TIMEZONE`, as an IANA name such as `Asia/Jakarta`. Servers run in UTC, so without it "today", weeks, months and the "Synced at" time follow UTC instead of your local time.
 
 Then redeploy, open the site, enter the password, and sign in to Garmin.
 
