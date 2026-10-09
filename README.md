@@ -39,9 +39,11 @@ Watch-face direction: the Today view is a scaled-up four-field data screen, like
 app/page.tsx               Live dashboard (redirects to /login when not connected)
 app/login/page.tsx         Sign-in page
 app/demo/page.tsx          Dashboard on demo data
+app/runs/[id]/page.tsx     One run in detail (demo: app/demo/runs/[id])
 app/actions.ts             Sign-in, verification code, sync and sign-out server actions
-components/dashboard/      Frame (header, tabs, range picker), views and trend sections
-components/charts/         TrendChart, PaceHrChart, Sparkline, RangePicker
+components/dashboard/      Frame (header, tabs, range picker), views, trends, insights, goals
+components/charts/         TrendChart, PaceHrChart, CalendarHeatmap, Sparkline, RangePicker
+components/activity/       Run detail: route shape, per-sample charts, splits
 components/watch-face.tsx  The four-field data screen
 components/stat-number.tsx Weight-encoded animated figures
 components/uselayouts/     Adapted uselayouts components
@@ -49,7 +51,12 @@ components/login-form.tsx  Sign-in and verification code form
 lib/garmin/auth.ts         Garmin SSO sign-in (incl. MFA), token storage
 lib/garmin/live.ts         Garmin Connect fetcher (today)
 lib/garmin/history.ts      Garmin Connect history for the trend charts
+lib/garmin/extras.ts       Personal records, shoes, the year calendar
+lib/garmin/activity.ts     One activity: streams, GPS route, laps
+lib/garmin/map.ts          Connect activity → Run mapping
 lib/trends.ts              Date ranges, weekly bucketing, training load
+lib/insights.ts            Weekly summary, sleep vs performance, recovery check, goals, race plan
+lib/settings.ts            Goals and race, stored in .stride/settings.json
 lib/garmin/demo.ts         Demo data
 lib/garmin/index.ts        getGarminDashboard(): cached live data
 lib/format.ts              Units, pace, durations, running totals
