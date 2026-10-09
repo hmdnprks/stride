@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import useMeasure from "react-use-measure";
-import { barPath, bucketLabel, linear, linePath, niceTicks, shortDay } from "./scale";
+import { barPath, bucketLabel, linear, linePath, niceTicks, shortDay, timeTicks } from "./scale";
 import { useTrendsPending } from "./pending";
 
 type Num = number | null;
@@ -63,6 +63,8 @@ export function TrendChart({
   format,
   domain,
   height = 200,
+  timeAxis = false,
+  hideLegend = false,
 }: {
   title: string;
   summary?: ReactNode;
@@ -73,6 +75,10 @@ export function TrendChart({
   /** Fixed y-domain, e.g. [0, 100] for scores. */
   domain?: [number, number];
   height?: number;
+  /** Values are durations in seconds: tick on 15 s / 30 s / 1 min steps. */
+  timeAxis?: boolean;
+  /** When a fuller key sits right beside the chart and names every series. */
+  hideLegend?: boolean;
 }) {
   const [ref, { width }] = useMeasure();
   const [hover, setHover] = useState<number | null>(null);
@@ -99,7 +105,11 @@ export function TrendChart({
   const lo = domain ? domain[0] : fromZero ? 0 : Math.min(...finite);
   const hi = domain ? domain[1] : Math.max(...finite);
   const pad = domain || fromZero ? 0 : (hi - lo) * 0.15 || 1;
-  const { ticks, min, max } = domain ? { ticks: niceTicks(lo, hi, 5).ticks, min: lo, max: hi } : niceTicks(lo - pad, hi + pad);
+  const { ticks, min, max } = domain
+    ? { ticks: niceTicks(lo, hi, 5).ticks, min: lo, max: hi }
+    : timeAxis
+      ? timeTicks(lo - pad, hi + pad)
+      : niceTicks(lo - pad, hi + pad);
 
   const plotW = Math.max(0, width - M.left - right);
   const n = rows.length;
@@ -148,7 +158,7 @@ export function TrendChart({
       <figcaption className="flex flex-col gap-1">
         <h3 className="text-base font-semibold">{title}</h3>
         {summary && <p className="text-sm text-muted-foreground">{summary}</p>}
-        {series.length > 1 && (
+        {series.length > 1 && !hideLegend && (
           <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             {series.map((s) => (
               <li key={s.label} className="flex items-center gap-1.5">

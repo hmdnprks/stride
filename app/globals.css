@@ -38,6 +38,12 @@
   --stage-rem: #6283fa;
   --stage-light: #1f47f5;
   --stage-deep: #0a1b5c;
+  /* Heart-rate zones Z1→Z5, ordinal (validated). */
+  --zone-1: #9aadff;
+  --zone-2: #6f8cfb;
+  --zone-3: #3d63f7;
+  --zone-4: #1f3fd0;
+  --zone-5: #0a1b5c;
   color-scheme: light;
 }
 
@@ -65,6 +71,11 @@
   --stage-rem: #5a7bff;
   --stage-light: #93acff;
   --stage-deep: #d3ddff;
+  --zone-1: #2d4bb8;
+  --zone-2: #4a6cf0;
+  --zone-3: #7391ff;
+  --zone-4: #a6bbff;
+  --zone-5: #dbe3ff;
   color-scheme: dark;
 }
 
@@ -92,6 +103,11 @@
   --color-stage-rem: var(--stage-rem);
   --color-stage-light: var(--stage-light);
   --color-stage-deep: var(--stage-deep);
+  --color-zone-1: var(--zone-1);
+  --color-zone-2: var(--zone-2);
+  --color-zone-3: var(--zone-3);
+  --color-zone-4: var(--zone-4);
+  --color-zone-5: var(--zone-5);
 
   --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 
