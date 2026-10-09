@@ -1,26 +1,153 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * Palette — black, white and running-track blue.
+ *   ink      #000000  text, true black
+ *   paper    #FFFFFF  page
+ *   track    #1F47F5  the watch-face panel and primary actions
+ *   lane     #DCE3F5  bar tracks, dividers
+ *   haze     #EEF2FD  quiet fills
+ *   slate    #57617D  secondary text
+ * Dark mode swaps paper for deep navy rather than a neutral near-black.
+ * Token names follow shadcn so uselayouts components work unchanged.
+ */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #000000;
+  --primary: #1f47f5;
+  --primary-foreground: #ffffff;
+  --secondary: #eef2fd;
+  --muted: #eef2fd;
+  --muted-foreground: #57617d;
+  --border: #dce3f5;
+  --popover: #ffffff;
+  --ring: #1f47f5;
+  --lane: #dce3f5;
+  --panel: #1f47f5;
+  --panel-foreground: #ffffff;
+  --panel-muted: #b9c7ff;
+  --panel-line: rgb(255 255 255 / 0.22);
+  --deep: #0a1b5c;
+  /* Charts — validated with the dataviz skill's validate_palette.js. */
+  --series: #1f47f5;
+  --context: #7b8299;
+  --grid: #e5e9f5;
+  --stage-awake: #9aadff;
+  --stage-rem: #6283fa;
+  --stage-light: #1f47f5;
+  --stage-deep: #0a1b5c;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --background: #040a1e;
+  --foreground: #f3f6ff;
+  --primary: #7391ff;
+  --primary-foreground: #040a1e;
+  --secondary: #0d1838;
+  --muted: #0d1838;
+  --muted-foreground: #8c99bd;
+  --border: #1a2a55;
+  --popover: #0a1430;
+  --ring: #7391ff;
+  --lane: #1a2a55;
+  --panel: #1a3ad6;
+  --panel-foreground: #ffffff;
+  --panel-muted: #aebcff;
+  --panel-line: rgb(255 255 255 / 0.2);
+  --deep: #c9d5ff;
+  --series: #6a88ff;
+  --context: #8d9099;
+  --grid: #16234a;
+  --stage-awake: #2d4bb8;
+  --stage-rem: #5a7bff;
+  --stage-light: #93acff;
+  --stage-deep: #d3ddff;
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-popover: var(--popover);
+  --color-ring: var(--ring);
+  --color-lane: var(--lane);
+  --color-panel: var(--panel);
+  --color-panel-foreground: var(--panel-foreground);
+  --color-panel-muted: var(--panel-muted);
+  --color-panel-line: var(--panel-line);
+  --color-deep: var(--deep);
+  --color-series: var(--series);
+  --color-context: var(--context);
+  --color-grid: var(--grid);
+  --color-stage-awake: var(--stage-awake);
+  --color-stage-rem: var(--stage-rem);
+  --color-stage-light: var(--stage-light);
+  --color-stage-deep: var(--stage-deep);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+
+  /* Type scale, 4:3-ish steps from a 16px base. */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.3125rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.375rem;
+  --text-3xl: 3.25rem;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+}
+
+/*
+ * Archivo is variable in weight and width. Numbers run condensed, like the
+ * data fields on a watch; headings run wide.
+ */
+.num {
+  font-variation-settings: "wdth" 62;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 0.82;
+}
+
+/* Page-load moment: big figures fill in from hairline to their weight. */
+.charge {
+  animation: charge 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.15s backwards;
+}
+
+@keyframes charge {
+  from {
+    font-weight: 150;
+  }
+}
+
+.wide {
+  font-variation-settings: "wdth" 125;
+  letter-spacing: -0.02em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
