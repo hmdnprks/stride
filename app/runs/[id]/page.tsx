@@ -4,12 +4,14 @@ import { connection } from "next/server";
 import { notFound, redirect } from "next/navigation";
 import { ActivitySkeleton, ActivityView } from "@/components/activity/activity-view";
 import { getGarminActivity, isConnected } from "@/lib/garmin";
+import { requireUnlocked } from "@/lib/gate-server";
 
 export const metadata: Metadata = { title: "Run | Stride" };
 
 async function Activity({ params }: { params: PageProps<"/runs/[id]">["params"] }) {
   await connection();
-  if (!isConnected()) redirect("/login");
+  await requireUnlocked();
+  if (!(await isConnected())) redirect("/login");
   const { id } = await params;
   const detail = await getGarminActivity(id);
   if (!detail) notFound();

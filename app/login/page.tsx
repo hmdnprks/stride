@@ -7,6 +7,7 @@ import { ChargeDemo } from "@/components/charge-demo";
 import { LoginForm } from "@/components/login-form";
 import { ThemeToggle } from "@/components/uselayouts/theme-toggle";
 import { isConnected } from "@/lib/garmin";
+import { requireUnlocked } from "@/lib/gate-server";
 
 export const metadata: Metadata = { title: "Connect Garmin | Stride" };
 
@@ -16,7 +17,8 @@ const NOTICES: Record<string, string> = {
 
 async function Gate({ searchParams }: { searchParams: PageProps<"/login">["searchParams"] }) {
   await connection();
-  if (isConnected()) redirect("/");
+  await requireUnlocked();
+  if (await isConnected()) redirect("/");
   const { reason } = await searchParams;
   return <LoginForm notice={typeof reason === "string" ? NOTICES[reason] : undefined} />;
 }

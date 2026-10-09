@@ -23,6 +23,19 @@ Garmin doesn't offer a public API for personal accounts (the official Health API
 - Garmin can change these endpoints at any time. Each section loads on its own, so if one breaks, only that card shows "no data", and the reason is listed in the page footer.
 - This is built for running on your own computer. The dashboard has no access control of its own, so don't deploy it publicly as is.
 
+## Deploying
+
+Stride is built for one person. Deployed, it needs two things a laptop doesn't:
+
+1. **A database** for your Garmin session, goals and sign-ins waiting for a verification code. Serverless hosts (Vercel, AWS Lambda) have a read-only disk. Stride uses Upstash Redis over its REST API (no extra package). Set either pair:
+   - `KV_REST_API_URL` and `KV_REST_API_TOKEN` (added automatically by Vercel's Upstash/Redis integration), or
+   - `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
+2. **A password** in front of the whole site: `STRIDE_PASSWORD`. Without it, a deployed Stride stays locked rather than exposing your health data. Use a long, random password; changing it signs every browser out.
+
+Then redeploy, open the site, enter the password, and sign in to Garmin.
+
+Locally, neither is required: with no database configured, data is kept in `.stride/kv.json` (git-ignored), and with no password set in development the site stays open.
+
 ## Design
 
 Watch-face direction: the Today view is a scaled-up four-field data screen, like a sport watch's.

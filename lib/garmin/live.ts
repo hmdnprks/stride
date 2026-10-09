@@ -35,7 +35,7 @@ function titleCase(raw: string) {
 }
 
 export async function getLiveDashboard(): Promise<Dashboard> {
-  const { gc, save } = savedClient();
+  const { gc, save } = await savedClient();
   const get = (url: string, params?: Record<string, unknown>) =>
     gc.get<Json>(`${API}${url}`, params ? { params } : undefined);
 
@@ -144,7 +144,7 @@ export async function getLiveDashboard(): Promise<Dashboard> {
     ]);
 
   // Tokens may have been refreshed during the requests above.
-  save();
+  await save();
 
   const s: Json = summary;
   return {

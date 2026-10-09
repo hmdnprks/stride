@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { Dashboard, DashboardSkeleton } from "@/components/dashboard";
 import { getDemoDashboard, getDemoExtras, getDemoInsightsData, getDemoTrends } from "@/lib/garmin";
+import { requireUnlocked } from "@/lib/gate-server";
 import { getSettings } from "@/lib/settings";
 import { parseRange } from "@/lib/trends";
 
@@ -11,6 +12,7 @@ export const metadata: Metadata = { title: "Demo data | Stride" };
 async function DemoDashboard({ searchParams }: { searchParams: PageProps<"/demo">["searchParams"] }) {
   // Demo data is generated relative to today, so render per request.
   await connection();
+  await requireUnlocked();
   const range = parseRange((await searchParams).range);
   return (
     <Dashboard
@@ -18,7 +20,7 @@ async function DemoDashboard({ searchParams }: { searchParams: PageProps<"/demo"
       trends={getDemoTrends(range)}
       extras={getDemoExtras()}
       insights={getDemoInsightsData()}
-      settings={getSettings("demo")}
+      settings={await getSettings("demo")}
     />
   );
 }

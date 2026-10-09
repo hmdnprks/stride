@@ -65,7 +65,7 @@ export async function getLiveTrends(range: Range): Promise<Trends> {
 
 /** Per-day wellness readings and runs for any date window. */
 export async function fetchHistory(from: string, to: string): Promise<History> {
-  const { gc, save } = savedClient();
+  const { gc, save } = await savedClient();
   const get = (url: string, params?: Record<string, unknown>) =>
     gc.get<Json>(`${API}${url}`, params ? { params } : undefined);
 
@@ -235,6 +235,6 @@ export async function fetchHistory(from: string, to: string): Promise<History> {
     }),
   ]);
 
-  save();
+  await save();
   return { daily: [...days.values()], runs, warnings };
 }

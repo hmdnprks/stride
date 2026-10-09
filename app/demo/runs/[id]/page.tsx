@@ -4,12 +4,14 @@ import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { ActivitySkeleton, ActivityView } from "@/components/activity/activity-view";
 import { getDemoActivity } from "@/lib/garmin";
+import { requireUnlocked } from "@/lib/gate-server";
 
 export const metadata: Metadata = { title: "Demo run | Stride" };
 
 async function Activity({ params }: { params: PageProps<"/demo/runs/[id]">["params"] }) {
   // Demo runs are generated relative to today.
   await connection();
+  await requireUnlocked();
   const { id } = await params;
   const detail = getDemoActivity(id);
   if (!detail) notFound();

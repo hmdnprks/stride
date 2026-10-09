@@ -4,13 +4,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { GarminConnect } from "garmin-connect";
+import { kvDel, kvGet, kvSet } from "../kv";
 
 // Sign-in to Garmin's SSO, the same flow the Garmin Connect mobile app uses.
 // We drive the SSO form ourselves (so we can handle the MFA code step), then
 // hand the resulting ticket to `garmin-connect` to exchange for OAuth tokens.
-// Only the tokens are saved; the password is never stored.
+// Only the tokens are saved (in the key-value store); the password never is.
 
-const TOKEN_DIR = path.join(process.cwd(), ".garmin-tokens");
+const TOKENS_KEY = "garmin-tokens";
+const MFA_TTL_SECONDS = 600;
+/** Where earlier local versions kept tokens; read once so local sign-ins carry over. */
+const LEGACY_TOKEN_DIR = path.join(process.cwd(), ".garmin-tokens");
 // The library insists on credentials even though we only ever use tokens.
 const NO_CREDENTIALS = { username: "", password: "" };
 const SSO = "https://sso.garmin.com/sso";
@@ -30,7 +34,11 @@ const SIGNIN_PARAMS = new URLSearchParams({
 
 /** Minimal cookie-keeping fetch for the SSO pages. */
 class SsoSession {
-  private jar = new Map<string, string>();
+  jar: Map<string, string>;
+
+  constructor(cookies: [string, string][] = []) {
+    this.jar = new Map(cookies);
+  }
 
   async request(url: string, init: RequestInit = {}) {
     const res = await fetch(url, {
@@ -69,15 +77,16 @@ const ticketOf = (html: string) => html.match(/embed\?ticket=([^"]+)"/)?.[1];
 const messageOf = (html: string) =>
   html.match(/id="status-message"[^>]*>([\s\S]*?)<\//)?.[1]?.replace(/\s+/g, " ").trim();
 
-// Pending MFA challenges, keyed by an id kept in an httpOnly cookie.
-// Kept on globalThis so dev-mode hot reloads don't drop them.
+// A sign-in waiting for its verification code, keyed by an id kept in an
+// httpOnly cookie. Stored in the key-value store (not memory) because on
+// serverless hosting the code may arrive at a different server instance.
 interface Pending {
-  session: SsoSession;
+  cookies: [string, string][];
   csrf: string;
-  expires: number;
 }
-const pending: Map<string, Pending> = ((globalThis as { __garminMfa?: Map<string, Pending> }).__garminMfa ??=
-  new Map());
+const mfaKey = (id: string) => `mfa:${id}`;
+
+type Tokens = ReturnType<GarminConnect["exportToken"]>;
 
 export type SignInResult =
   | { ok: true }
@@ -89,7 +98,7 @@ async function finish(ticket: string) {
   await gc.client.fetchOauthConsumer();
   const oauth1 = await gc.client.getOauth1Token(ticket);
   await gc.client.exchange(oauth1);
-  gc.exportTokenToFile(TOKEN_DIR);
+  await kvSet(TOKENS_KEY, gc.exportToken());
 }
 
 function explain(status: number, html: string) {
@@ -120,7 +129,7 @@ export async function signIn(email: string, password: string): Promise<SignInRes
     const mfaCsrf = csrfOf(res.html);
     if (!mfaCsrf) return { ok: false, error: "Garmin asked for a verification code but the page was unexpected." };
     const mfaId = randomUUID();
-    pending.set(mfaId, { session, csrf: mfaCsrf, expires: Date.now() + 10 * 60_000 });
+    await kvSet(mfaKey(mfaId), { cookies: [...session.jar], csrf: mfaCsrf } satisfies Pending, MFA_TTL_SECONDS);
     return { ok: false, mfaId };
   }
 
@@ -131,13 +140,11 @@ export async function signIn(email: string, password: string): Promise<SignInRes
 }
 
 export async function verifyMfa(mfaId: string, code: string): Promise<SignInResult> {
-  const p = pending.get(mfaId);
-  if (!p || p.expires < Date.now()) {
-    pending.delete(mfaId);
-    return { ok: false, error: "That verification step expired. Sign in again." };
-  }
+  const p = await kvGet<Pending>(mfaKey(mfaId));
+  if (!p) return { ok: false, error: "That verification step expired. Sign in again." };
+  const session = new SsoSession(p.cookies);
 
-  const res = await p.session.post(`${SSO}/verifyMFA/loginEnterMfaCode?${SIGNIN_PARAMS}`, {
+  const res = await session.post(`${SSO}/verifyMFA/loginEnterMfaCode?${SIGNIN_PARAMS}`, {
     "mfa-code": code,
     embed: "true",
     _csrf: p.csrf,
@@ -148,29 +155,68 @@ export async function verifyMfa(mfaId: string, code: string): Promise<SignInResu
   if (!ticket) {
     // Garmin re-renders the code form on a wrong code; keep the challenge alive.
     const retryCsrf = csrfOf(res.html);
-    if (retryCsrf) p.csrf = retryCsrf;
+    await kvSet(mfaKey(mfaId), { cookies: [...session.jar], csrf: retryCsrf ?? p.csrf } satisfies Pending, MFA_TTL_SECONDS);
     return { ok: false, error: messageOf(res.html) ?? "That code didn't work. Check it and try again." };
   }
 
-  pending.delete(mfaId);
+  await kvDel(mfaKey(mfaId));
   await finish(ticket);
   return { ok: true };
 }
 
-export function isConnected() {
-  return fs.existsSync(path.join(TOKEN_DIR, "oauth1_token.json")) && fs.existsSync(path.join(TOKEN_DIR, "oauth2_token.json"));
+async function loadTokens(): Promise<Tokens | null> {
+  const saved = await kvGet<Tokens>(TOKENS_KEY);
+  if (saved) return saved;
+  // Carry over a session from the old file-based storage (local runs only).
+  try {
+    return {
+      oauth1: JSON.parse(fs.readFileSync(path.join(LEGACY_TOKEN_DIR, "oauth1_token.json"), "utf8")),
+      oauth2: JSON.parse(fs.readFileSync(path.join(LEGACY_TOKEN_DIR, "oauth2_token.json"), "utf8")),
+    };
+  } catch {
+    return null;
+  }
 }
 
-export function disconnect() {
-  fs.rmSync(TOKEN_DIR, { recursive: true, force: true });
+export async function isConnected() {
+  return (await loadTokens()) !== null;
+}
+
+export async function disconnect() {
+  await kvDel(TOKENS_KEY);
+  fs.rmSync(LEGACY_TOKEN_DIR, { recursive: true, force: true });
+}
+
+/**
+ * garmin-connect never settles a request if refreshing an expired session
+ * fails (a module-level "refreshing" flag stays set), so every call gets a
+ * deadline. A dead session then fails fast and the page sends you to sign in.
+ */
+const GARMIN_TIMEOUT_MS = 15_000;
+
+function withDeadline<T>(work: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error("Garmin didn't respond in time. Your session may have expired; sign in again.")),
+      GARMIN_TIMEOUT_MS,
+    );
+  });
+  return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
 }
 
 /** A client authenticated with the saved tokens. Refreshes OAuth2 as needed. */
-export function savedClient() {
+export async function savedClient() {
+  const tokens = await loadTokens();
+  if (!tokens) throw new Error("Not connected to Garmin.");
   const gc = new GarminConnect(NO_CREDENTIALS);
-  gc.loadTokenByFile(TOKEN_DIR);
+  gc.loadToken(tokens.oauth1, tokens.oauth2);
   return {
-    gc,
-    save: () => gc.exportTokenToFile(TOKEN_DIR),
+    gc: {
+      get: <T>(url: string, config?: Parameters<GarminConnect["get"]>[1]) => withDeadline(gc.get<T>(url, config)),
+      getUserProfile: () => withDeadline(gc.getUserProfile()),
+    },
+    /** Persist tokens, which the library may have refreshed during requests. */
+    save: () => kvSet(TOKENS_KEY, gc.exportToken()),
   };
 }

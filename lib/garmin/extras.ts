@@ -31,7 +31,7 @@ const PR_TYPES: Record<number, { label: string; distanceM: number }> = {
 const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : null);
 
 export async function getLiveExtras(): Promise<RunningExtras> {
-  const { gc, save } = savedClient();
+  const { gc, save } = await savedClient();
   const get = (url: string, params?: Record<string, unknown>) =>
     gc.get<Json>(`${API}${url}`, params ? { params } : undefined);
   const profile = await gc.getUserProfile();
@@ -118,6 +118,6 @@ export async function getLiveExtras(): Promise<RunningExtras> {
     }),
   ]);
 
-  save();
+  await save();
   return { records, gear, hrZones, calendar: buildCalendar(runs, today), warnings };
 }

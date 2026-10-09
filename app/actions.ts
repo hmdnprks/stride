@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { refresh, updateTag } from "next/cache";
 import { disconnect, signIn, verifyMfa, type SignInResult } from "@/lib/garmin/auth";
 import { GARMIN_CACHE_TAG, type DataSource } from "@/lib/garmin";
+import { assertUnlocked } from "@/lib/gate-server";
 import { saveSettings } from "@/lib/settings";
 
 const MFA_COOKIE = "garmin_mfa";
@@ -27,6 +28,7 @@ async function settle(result: SignInResult, email: string | undefined, stepOnErr
 
 /** Single entry point for the sign-in form; the submit button's `intent` picks the step. */
 export async function authAction(prev: SignInState, form: FormData): Promise<SignInState> {
+  await assertUnlocked();
   switch (form.get("intent")) {
     case "verify":
       return verifyMfaStep(prev, form);
@@ -72,13 +74,15 @@ async function verifyMfaStep(prev: SignInState, form: FormData): Promise<SignInS
 }
 
 export async function signOutAction() {
-  disconnect();
+  await assertUnlocked();
+  await disconnect();
   updateTag(GARMIN_CACHE_TAG);
   redirect("/login");
 }
 
 /** Drops the 15-minute cache so the next render pulls fresh data from Garmin. */
 export async function syncAction() {
+  await assertUnlocked();
   updateTag(GARMIN_CACHE_TAG);
 }
 
@@ -88,8 +92,9 @@ const sourceOf = (v: unknown): DataSource => (v === "garmin" ? "garmin" : "demo"
 
 /** Save a monthly or yearly distance goal in km; empty or 0 clears it. */
 export async function saveGoalAction(source: DataSource, period: "month" | "year", km: number | null) {
+  await assertUnlocked();
   const value = km !== null && Number.isFinite(km) && km > 0 ? Math.min(100_000, Math.round(km)) : null;
-  saveSettings(sourceOf(source), period === "month" ? { monthKm: value } : { yearKm: value });
+  await saveSettings(sourceOf(source), period === "month" ? { monthKm: value } : { yearKm: value });
   refresh();
 }
 
@@ -98,6 +103,7 @@ export type RaceFormState = { error?: string; saved?: boolean };
 const DISTANCES: Record<string, number> = { "5k": 5, "10k": 10, half: 21.0975, marathon: 42.195 };
 
 export async function saveRaceAction(_: RaceFormState, form: FormData): Promise<RaceFormState> {
+  await assertUnlocked();
   const source = sourceOf(form.get("source"));
   const name = String(form.get("name") ?? "").trim().slice(0, 80);
   const date = String(form.get("date") ?? "");
@@ -109,12 +115,13 @@ export async function saveRaceAction(_: RaceFormState, form: FormData): Promise<
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Pick the race date." };
   if (!Number.isFinite(distanceKm)) return { error: "Choose a distance, or enter one in km." };
 
-  saveSettings(source, { race: { name, date, distanceKm } });
+  await saveSettings(source, { race: { name, date, distanceKm } });
   refresh();
   return { saved: true };
 }
 
 export async function clearRaceAction(source: DataSource) {
-  saveSettings(sourceOf(source), { race: null });
+  await assertUnlocked();
+  await saveSettings(sourceOf(source), { race: null });
   refresh();
 }

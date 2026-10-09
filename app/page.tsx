@@ -13,13 +13,15 @@ import {
   type RunningExtras,
   type Trends,
 } from "@/lib/garmin";
+import { requireUnlocked } from "@/lib/gate-server";
 import { getSettings } from "@/lib/settings";
 import { parseRange } from "@/lib/trends";
 
 async function LiveDashboard({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
   // Health data is per-request (and per-day), never part of the build output.
   await connection();
-  if (!isConnected()) redirect("/login");
+  await requireUnlocked();
+  if (!(await isConnected())) redirect("/login");
   const range = parseRange((await searchParams).range);
 
   // History is optional: if it fails, the charts say so and today still shows.
@@ -54,7 +56,7 @@ async function LiveDashboard({ searchParams }: { searchParams: PageProps<"/">["s
   }
 
   const [trends, extras, insights] = await Promise.all([trendsP, extrasP, insightsP]);
-  return <Dashboard data={data} trends={trends} extras={extras} insights={insights} settings={getSettings("garmin")} />;
+  return <Dashboard data={data} trends={trends} extras={extras} insights={insights} settings={await getSettings("garmin")} />;
 }
 
 export default function Home({ searchParams }: PageProps<"/">) {

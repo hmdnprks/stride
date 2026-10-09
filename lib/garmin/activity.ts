@@ -18,7 +18,7 @@ const spm = (x: number | null) => (x === null ? null : x < 120 ? Math.round(x * 
 
 export async function getLiveActivity(id: string): Promise<ActivityDetail | null> {
   if (!/^\d+$/.test(id)) return null;
-  const { gc, save } = savedClient();
+  const { gc, save } = await savedClient();
   const get = (url: string) => gc.get<Json>(`${API}${url}`);
   const warnings: string[] = [];
 
@@ -100,7 +100,7 @@ export async function getLiveActivity(id: string): Promise<ActivityDetail | null
     }),
   );
 
-  save();
+  await save();
   return {
     run,
     maxHr: num(s.maxHR),
