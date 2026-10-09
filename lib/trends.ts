@@ -1,4 +1,4 @@
-import type { DailyRaw, Range, Run, RunPoint, TrendPoint, Trends } from "./garmin/types";
+import type { CalendarDay, DailyRaw, Range, Run, RunPoint, TrendPoint, Trends } from "./garmin/types";
 
 /** Days covered by each range, today included. */
 export const RANGE_DAYS: Record<Range, number> = { "7d": 7, "4w": 28, "3m": 91, "1y": 364 };
@@ -75,6 +75,25 @@ export function buildTrends(range: Range, daily: DailyRaw[], runs: Run[], warnin
   };
   const hasLoads = runs.some((r) => r.load !== null);
 
+  const runsByDate = new Map<string, Run[]>();
+  for (const r of runs) {
+    const date = r.startLocal.slice(0, 10);
+    runsByDate.set(date, [...(runsByDate.get(date) ?? []), r]);
+  }
+
+  /** Distance-weighted mean of a per-run field over some runs. */
+  const weighted = (rs: Run[], f: (r: Run) => number | null) => {
+    let sum = 0;
+    let w = 0;
+    for (const r of rs) {
+      const v = f(r);
+      if (v === null) continue;
+      sum += v * r.distanceM;
+      w += r.distanceM;
+    }
+    return w ? sum / w : null;
+  };
+
   // Group the range's days into buckets.
   const groups = new Map<string, string[]>();
   for (const date of eachDay(from, to)) {
@@ -86,6 +105,17 @@ export function buildTrends(range: Range, daily: DailyRaw[], runs: Run[], warnin
     const days = dates.map((d) => byDate.get(d)).filter((d): d is DailyRaw => !!d);
     const pick = (f: (d: DailyRaw) => number | null) => avg(days.map(f));
     const end = dates[dates.length - 1];
+    const bucketRuns = dates.flatMap((d) => runsByDate.get(d) ?? []);
+    const zoned = bucketRuns.filter((r) => r.hrZones);
+    const zoneH = (z: number) => (zoned.length ? round(zoned.reduce((a, r) => a + r.hrZones![z], 0) / 3600, 2) : null);
+    // Race predictions: the most recent reading in the bucket.
+    const latest = (f: (d: DailyRaw) => number | null) => {
+      for (let i = days.length - 1; i >= 0; i--) {
+        const v = f(days[i]);
+        if (v !== null) return Math.round(v);
+      }
+      return null;
+    };
     return {
       start,
       bbHigh: round(pick((d) => d.bbHigh)),
@@ -105,6 +135,19 @@ export function buildTrends(range: Range, daily: DailyRaw[], runs: Run[], warnin
       runs: dates.reduce((a, d) => a + (runDay.get(d)?.runs ?? 0), 0),
       acuteLoad: hasLoads ? Math.round(sumLoad(end, 7)) : null,
       chronicLoad: hasLoads ? Math.round(sumLoad(end, 28) / 4) : null,
+      z1H: zoneH(0),
+      z2H: zoneH(1),
+      z3H: zoneH(2),
+      z4H: zoneH(3),
+      z5H: zoneH(4),
+      cadenceSpm: round(weighted(bucketRuns, (r) => r.cadenceSpm)),
+      strideCm: round(weighted(bucketRuns, (r) => r.strideCm)),
+      groundContactMs: round(weighted(bucketRuns, (r) => r.groundContactMs)),
+      verticalRatioPct: round(weighted(bucketRuns, (r) => r.verticalRatioPct), 1),
+      pred5k: latest((d) => d.pred5k),
+      pred10k: latest((d) => d.pred10k),
+      predHalf: latest((d) => d.predHalf),
+      predMarathon: latest((d) => d.predMarathon),
     };
   });
 
@@ -128,4 +171,22 @@ export function buildTrends(range: Range, daily: DailyRaw[], runs: Run[], warnin
 
 export function parseRange(value: unknown): Range {
   return typeof value === "string" && (["7d", "4w", "3m", "1y"] as string[]).includes(value) ? (value as Range) : "4w";
+}
+
+/** Monday 52 weeks before this week's Monday: the first day the calendar shows. */
+export function calendarStart(today = isoDate(new Date())) {
+  return addDays(mondayOf(today), -52 * 7);
+}
+
+/** Daily distance for the training calendar, oldest first. */
+export function buildCalendar(runs: Run[], today = isoDate(new Date())): CalendarDay[] {
+  const byDate = new Map<string, CalendarDay>();
+  for (const date of eachDay(calendarStart(today), today)) byDate.set(date, { date, km: 0, runs: 0 });
+  for (const r of runs) {
+    const day = byDate.get(r.startLocal.slice(0, 10));
+    if (!day) continue;
+    day.km = Math.round((day.km + r.distanceM / 1000) * 10) / 10;
+    day.runs += 1;
+  }
+  return [...byDate.values()];
 }

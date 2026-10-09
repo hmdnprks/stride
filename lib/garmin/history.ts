@@ -1,6 +1,7 @@
 import "server-only";
 
 import { savedClient } from "./auth";
+import { mapRun } from "./map";
 import type { DailyRaw, Range, Run, Trends } from "./types";
 import { addDays, buildTrends, eachDay, isoDate, LOAD_WARMUP_DAYS, rangeWindow } from "../trends";
 
@@ -48,14 +49,27 @@ function batteryLevel(sample: unknown) {
   return typeof level === "number" ? level : null;
 }
 
+export interface History {
+  daily: DailyRaw[];
+  /** Runs from LOAD_WARMUP_DAYS before `from`, so load figures are warm. */
+  runs: Run[];
+  warnings: string[];
+}
+
 export async function getLiveTrends(range: Range): Promise<Trends> {
+  const today = isoDate(new Date());
+  const { from, to } = rangeWindow(range, today);
+  const h = await fetchHistory(from, to);
+  return buildTrends(range, h.daily, h.runs, h.warnings, today);
+}
+
+/** Per-day wellness readings and runs for any date window. */
+export async function fetchHistory(from: string, to: string): Promise<History> {
   const { gc, save } = savedClient();
   const get = (url: string, params?: Record<string, unknown>) =>
     gc.get<Json>(`${API}${url}`, params ? { params } : undefined);
 
   const user = (await gc.getUserProfile()).displayName;
-  const today = isoDate(new Date());
-  const { from, to } = rangeWindow(range, today);
   const windows = chunks(from, to);
   const warnings: string[] = [];
 
@@ -77,6 +91,10 @@ export async function getLiveTrends(range: Range): Promise<Trends> {
         hrvLow: null,
         hrvHigh: null,
         vo2: null,
+        pred5k: null,
+        pred10k: null,
+        predHalf: null,
+        predMarathon: null,
       },
     ]),
   );
@@ -185,6 +203,22 @@ export async function getLiveTrends(range: Range): Promise<Trends> {
       }),
     ),
 
+    metric("Race predictor", async () => {
+      // One request for the whole range; Connect's own chart asks the same way.
+      const raw: Json[] = await get(`/metrics-service/metrics/racepredictions/daily/${user}`, {
+        fromCalendarDate: from,
+        toCalendarDate: to,
+      });
+      for (const r of raw ?? []) {
+        set(r?.calendarDate, {
+          pred5k: num(r?.time5K),
+          pred10k: num(r?.time10K),
+          predHalf: num(r?.timeHalfMarathon),
+          predMarathon: num(r?.timeMarathon),
+        });
+      }
+    }),
+
     metric("Runs", async () => {
       const PAGE = 100;
       for (let start = 0; ; start += PAGE) {
@@ -195,25 +229,12 @@ export async function getLiveTrends(range: Range): Promise<Trends> {
           startDate: addDays(from, -LOAD_WARMUP_DAYS),
           endDate: to,
         });
-        runs = runs.concat(
-          (page ?? []).map(
-            (a): Run => ({
-              id: String(a.activityId),
-              name: a.activityName ?? "Run",
-              startLocal: a.startTimeLocal,
-              distanceM: a.distance ?? 0,
-              durationSec: a.duration ?? 0,
-              avgHr: a.averageHR ?? null,
-              elevationGainM: a.elevationGain ?? null,
-              load: a.activityTrainingLoad ?? null,
-            }),
-          ),
-        );
+        runs = runs.concat((page ?? []).map(mapRun));
         if (!page || page.length < PAGE) break;
       }
     }),
   ]);
 
   save();
-  return buildTrends(range, [...days.values()], runs, warnings, today);
+  return { daily: [...days.values()], runs, warnings };
 }

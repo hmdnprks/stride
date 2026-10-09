@@ -42,3 +42,6 @@ next-env.d.ts
 
 # garmin session tokens
 .garmin-tokens/
+
+# stride goals and race settings (local, per machine)
+.stride/

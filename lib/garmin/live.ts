@@ -1,7 +1,8 @@
 import "server-only";
 
 import { savedClient } from "./auth";
-import type { Dashboard, Run } from "./types";
+import { mapRun } from "./map";
+import type { Dashboard } from "./types";
 
 // Garmin has no public API for personal accounts. This uses the unofficial
 // Connect endpoints (same ones the web app calls) via the `garmin-connect`
@@ -138,18 +139,7 @@ export async function getLiveDashboard(): Promise<Dashboard> {
           limit: 60,
           activityType: "running",
         });
-        return (raw ?? []).map(
-          (a): Run => ({
-            id: String(a.activityId),
-            name: a.activityName ?? "Run",
-            startLocal: a.startTimeLocal,
-            distanceM: a.distance ?? 0,
-            durationSec: a.duration ?? 0,
-            avgHr: a.averageHR ?? null,
-            elevationGainM: a.elevationGain ?? null,
-            load: a.activityTrainingLoad ?? null,
-          }),
-        );
+        return (raw ?? []).map(mapRun);
       }),
     ]);
 
