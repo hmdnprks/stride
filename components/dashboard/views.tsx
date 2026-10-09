@@ -1,8 +1,13 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
-import type { Dashboard, Run, Sleep, Trends } from "@/lib/garmin";
+import type { Dashboard, Run, RunningExtras, Sleep, Trends } from "@/lib/garmin";
+import type { recoveryCheck, sleepPerformance, weeklySummary } from "@/lib/insights";
 import { clock, hm, km, pace, paceOf, runningTotals, shortDate } from "@/lib/format";
+import { CalendarHeatmap } from "../charts/calendar-heatmap";
 import { Sparkline } from "../charts/sparkline";
 import { WatchFace } from "../watch-face";
+import { RecoveryCheck, SleepPerformance, WeeklySummary } from "./insights";
+import { PersonalRecords, ShoeMileage } from "./records";
 import { FitnessTrends, RecoveryTrends, RunningTrends } from "./trends";
 
 /* Shared bits */
@@ -98,7 +103,17 @@ function SleepStages({ sleep }: { sleep: Sleep }) {
   );
 }
 
-export function TodayView({ data, trends }: { data: Dashboard; trends: Trends }) {
+export function TodayView({
+  data,
+  trends,
+  recovery,
+  week,
+}: {
+  data: Dashboard;
+  trends: Trends;
+  recovery: ReturnType<typeof recoveryCheck>;
+  week: ReturnType<typeof weeklySummary>;
+}) {
   const recent = (key: keyof Trends["points"][number]) =>
     trends.points.slice(-14).map((p) => (typeof p[key] === "number" ? (p[key] as number) : null));
   const { bodyBattery: bb, sleep, heart } = data;
@@ -112,6 +127,8 @@ export function TodayView({ data, trends }: { data: Dashboard; trends: Trends })
         <h1 className="wide text-2xl leading-[1.05] font-bold text-balance sm:text-3xl">{headline}</h1>
         {detail && <p className="text-lg text-muted-foreground">{detail}</p>}
       </header>
+
+      {recovery.level !== "ok" && <RecoveryCheck check={recovery} />}
 
       <div className="flex flex-col gap-3">
         <WatchFace
@@ -182,6 +199,9 @@ export function TodayView({ data, trends }: { data: Dashboard; trends: Trends })
         </section>
       </div>
 
+      {recovery.level === "ok" && <RecoveryCheck check={recovery} />}
+      <WeeklySummary week={week} />
+
       <RecoveryTrends trends={trends} />
     </div>
   );
@@ -189,7 +209,15 @@ export function TodayView({ data, trends }: { data: Dashboard; trends: Trends })
 
 /* Fitness */
 
-export function FitnessView({ data, trends }: { data: Dashboard; trends: Trends }) {
+export function FitnessView({
+  data,
+  trends,
+  sleepPerf,
+}: {
+  data: Dashboard;
+  trends: Trends;
+  sleepPerf: ReturnType<typeof sleepPerformance>;
+}) {
   const { vo2Max, fitnessAge, trainingStatus, racePredictions: rp } = data;
   const races = rp
     ? [
@@ -277,6 +305,8 @@ export function FitnessView({ data, trends }: { data: Dashboard; trends: Trends 
         )}
       </section>
 
+      <SleepPerformance result={sleepPerf} />
+
       <FitnessTrends trends={trends} />
     </div>
   );
@@ -284,25 +314,31 @@ export function FitnessView({ data, trends }: { data: Dashboard; trends: Trends 
 
 /* Runs */
 
-function RunRow({ run }: { run: Run }) {
+function RunRow({ run, href }: { run: Run; href: string }) {
   return (
-    <li className="grid grid-cols-[1fr_auto] items-baseline gap-x-6 gap-y-1 border-b border-border py-4 md:grid-cols-[8rem_1fr_7rem_6rem_6rem_4rem]">
-      <span className="order-2 text-sm text-muted-foreground md:order-none">{shortDate(run.startLocal)}</span>
-      <span className="order-1 font-semibold md:order-none">{run.name}</span>
-      <span className="order-1 text-right md:order-none">
-        <span className="num text-[2.375rem] font-semibold">{km(run.distanceM, 2)}</span>
-        <span className="ml-1 text-sm text-muted-foreground">km</span>
-      </span>
-      <span className="order-3 col-span-2 flex gap-4 text-sm tabular-nums md:order-none md:col-span-3 md:grid md:grid-cols-[6rem_6rem_4rem] md:text-right md:text-base">
-        <span>{clock(run.durationSec)}</span>
-        <span className="font-semibold text-primary">{pace(paceOf(run))} /km</span>
-        <span className="text-muted-foreground">{run.avgHr ? `${run.avgHr} bpm` : ""}</span>
-      </span>
+    <li className="border-b border-border">
+      <Link
+        href={href}
+        className="group -mx-3 grid grid-cols-[1fr_auto] items-baseline gap-x-6 gap-y-1 rounded-xl px-3 py-4 transition-colors hover:bg-muted md:grid-cols-[8rem_1fr_7rem_6rem_6rem_4rem]"
+      >
+        <span className="order-2 text-sm text-muted-foreground md:order-none">{shortDate(run.startLocal)}</span>
+        <span className="order-1 font-semibold underline-offset-4 group-hover:underline md:order-none">{run.name}</span>
+        <span className="order-1 text-right md:order-none">
+          <span className="num text-[2.375rem] font-semibold">{km(run.distanceM, 2)}</span>
+          <span className="ml-1 text-sm text-muted-foreground">km</span>
+        </span>
+        <span className="order-3 col-span-2 flex gap-4 text-sm tabular-nums md:order-none md:col-span-3 md:grid md:grid-cols-[6rem_6rem_4rem] md:text-right md:text-base">
+          <span>{clock(run.durationSec)}</span>
+          <span className="font-semibold text-primary">{pace(paceOf(run))} /km</span>
+          <span className="text-muted-foreground">{run.avgHr ? `${run.avgHr} bpm` : ""}</span>
+        </span>
+      </Link>
     </li>
   );
 }
 
-export function RunsView({ data, trends }: { data: Dashboard; trends: Trends }) {
+export function RunsView({ data, trends, extras }: { data: Dashboard; trends: Trends; extras: RunningExtras }) {
+  const runHref = (id: string) => (data.source === "demo" ? `/demo/runs/${id}` : `/runs/${id}`);
   const { week, month, longest } = runningTotals(data.runs);
 
   return (
@@ -335,7 +371,7 @@ export function RunsView({ data, trends }: { data: Dashboard; trends: Trends }) 
         {data.runs.length ? (
           <ul>
             {data.runs.slice(0, 12).map((r) => (
-              <RunRow key={r.id} run={r} />
+              <RunRow key={r.id} run={r} href={runHref(r.id)} />
             ))}
           </ul>
         ) : (
@@ -343,7 +379,27 @@ export function RunsView({ data, trends }: { data: Dashboard; trends: Trends }) 
         )}
       </section>
 
-      <RunningTrends trends={trends} />
+      <CalendarHeatmap days={extras.calendar} />
+
+      <div className="grid gap-12 md:grid-cols-2 md:gap-14">
+        <section className="flex flex-col gap-4">
+          <Heading>Personal records</Heading>
+          <PersonalRecords records={extras.records} runHref={runHref} />
+        </section>
+        <section className="flex flex-col gap-4">
+          <Heading>Shoes</Heading>
+          <ShoeMileage gear={extras.gear} />
+        </section>
+      </div>
+      {extras.warnings.length > 0 && (
+        <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
+          {extras.warnings.map((w) => (
+            <li key={w}>Couldn&apos;t load {w}</li>
+          ))}
+        </ul>
+      )}
+
+      <RunningTrends trends={trends} hrZones={extras.hrZones} />
     </div>
   );
 }

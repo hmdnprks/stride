@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useDeferredValue, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { HeartCheckIcon, Link01Icon, Logout03Icon, RunningShoesIcon, Sun03Icon } from "@hugeicons/core-free-icons";
+import { HeartCheckIcon, Link01Icon, Logout03Icon, RunningShoesIcon, Sun03Icon, Target01Icon } from "@hugeicons/core-free-icons";
 import { signOutAction, syncAction } from "@/app/actions";
 import type { Range } from "@/lib/garmin/types";
 import { TrendsPending } from "../charts/pending";
@@ -14,12 +14,13 @@ import { SmoothDropdown, type DropdownItem } from "../uselayouts/smooth-dropdown
 import { StatusButton, type ButtonStatus } from "../uselayouts/save-button";
 import { ThemeToggle } from "../uselayouts/theme-toggle";
 
-type View = "today" | "fitness" | "runs";
+type View = "today" | "fitness" | "runs" | "goals";
 
 const TABS: DiscreteTab<View>[] = [
   { id: "today", title: "Today", icon: Sun03Icon },
   { id: "fitness", title: "Fitness", icon: HeartCheckIcon },
   { id: "runs", title: "Runs", icon: RunningShoesIcon },
+  { id: "goals", title: "Goals", icon: Target01Icon },
 ];
 
 // The open tab lives in the URL hash so reloads and shared links keep it.
@@ -153,10 +154,13 @@ export function DashboardFrame({
       </header>
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-8 sm:py-10">
-        <div className="mb-10 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span className="text-sm text-muted-foreground">Trends over</span>
-          <RangePicker value={shownRange} onChange={changeRange} />
-        </div>
+        {/* Goals don't follow the trend range, so the picker steps aside there. */}
+        {shownView !== "goals" && (
+          <div className="mb-10 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className="text-sm text-muted-foreground">Trends over</span>
+            <RangePicker value={shownRange} onChange={changeRange} />
+          </div>
+        )}
         <TrendsPending value={pending}>
           {animatePanels ? (
             <AnimatePresence mode="wait" initial={false}>

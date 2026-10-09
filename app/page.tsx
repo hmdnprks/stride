@@ -2,7 +2,18 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { Dashboard, DashboardSkeleton } from "@/components/dashboard";
-import { getGarminDashboard, getGarminTrends, isConnected, type Dashboard as Data, type Trends } from "@/lib/garmin";
+import {
+  getGarminDashboard,
+  getGarminExtras,
+  getGarminInsightsData,
+  getGarminTrends,
+  isConnected,
+  type Dashboard as Data,
+  type InsightsData,
+  type RunningExtras,
+  type Trends,
+} from "@/lib/garmin";
+import { getSettings } from "@/lib/settings";
 import { parseRange } from "@/lib/trends";
 
 async function LiveDashboard({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
@@ -20,6 +31,20 @@ async function LiveDashboard({ searchParams }: { searchParams: PageProps<"/">["s
     warnings: [`history: ${err instanceof Error ? err.message : "failed"}`],
   }));
 
+  const extrasP: Promise<RunningExtras> = getGarminExtras().catch((err) => ({
+    records: [],
+    gear: [],
+    hrZones: null,
+    calendar: [],
+    warnings: [`records and shoes: ${err instanceof Error ? err.message : "failed"}`],
+  }));
+
+  const insightsP: Promise<InsightsData> = getGarminInsightsData().catch((err) => ({
+    daily: [],
+    runs: [],
+    warnings: [`insights: ${err instanceof Error ? err.message : "failed"}`],
+  }));
+
   let data: Data;
   try {
     data = await getGarminDashboard();
@@ -28,7 +53,8 @@ async function LiveDashboard({ searchParams }: { searchParams: PageProps<"/">["s
     redirect("/login?reason=expired");
   }
 
-  return <Dashboard data={data} trends={await trendsP} />;
+  const [trends, extras, insights] = await Promise.all([trendsP, extrasP, insightsP]);
+  return <Dashboard data={data} trends={trends} extras={extras} insights={insights} settings={getSettings("garmin")} />;
 }
 
 export default function Home({ searchParams }: PageProps<"/">) {

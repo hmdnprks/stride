@@ -2,9 +2,10 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { updateTag } from "next/cache";
+import { refresh, updateTag } from "next/cache";
 import { disconnect, signIn, verifyMfa, type SignInResult } from "@/lib/garmin/auth";
-import { GARMIN_CACHE_TAG } from "@/lib/garmin";
+import { GARMIN_CACHE_TAG, type DataSource } from "@/lib/garmin";
+import { saveSettings } from "@/lib/settings";
 
 const MFA_COOKIE = "garmin_mfa";
 
@@ -79,4 +80,41 @@ export async function signOutAction() {
 /** Drops the 15-minute cache so the next render pulls fresh data from Garmin. */
 export async function syncAction() {
   updateTag(GARMIN_CACHE_TAG);
+}
+
+/* ---------- Goals and race (stored locally in .stride/settings.json) ---------- */
+
+const sourceOf = (v: unknown): DataSource => (v === "garmin" ? "garmin" : "demo");
+
+/** Save a monthly or yearly distance goal in km; empty or 0 clears it. */
+export async function saveGoalAction(source: DataSource, period: "month" | "year", km: number | null) {
+  const value = km !== null && Number.isFinite(km) && km > 0 ? Math.min(100_000, Math.round(km)) : null;
+  saveSettings(sourceOf(source), period === "month" ? { monthKm: value } : { yearKm: value });
+  refresh();
+}
+
+export type RaceFormState = { error?: string; saved?: boolean };
+
+const DISTANCES: Record<string, number> = { "5k": 5, "10k": 10, half: 21.0975, marathon: 42.195 };
+
+export async function saveRaceAction(_: RaceFormState, form: FormData): Promise<RaceFormState> {
+  const source = sourceOf(form.get("source"));
+  const name = String(form.get("name") ?? "").trim().slice(0, 80);
+  const date = String(form.get("date") ?? "");
+  const preset = String(form.get("distance") ?? "");
+  const custom = Number(form.get("customKm"));
+  const distanceKm = DISTANCES[preset] ?? (preset === "custom" && custom > 0 && custom <= 400 ? custom : NaN);
+
+  if (!name) return { error: "Give the race a name." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Pick the race date." };
+  if (!Number.isFinite(distanceKm)) return { error: "Choose a distance, or enter one in km." };
+
+  saveSettings(source, { race: { name, date, distanceKm } });
+  refresh();
+  return { saved: true };
+}
+
+export async function clearRaceAction(source: DataSource) {
+  saveSettings(sourceOf(source), { race: null });
+  refresh();
 }
