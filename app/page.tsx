@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { connection } from "next/server";
+import { after, connection } from "next/server";
 import { redirect } from "next/navigation";
 import { Dashboard, DashboardSkeleton } from "@/components/dashboard";
 import {
@@ -8,6 +8,7 @@ import {
   getGarminInsightsData,
   getGarminTrends,
   isConnected,
+  syncHistoryIfBehind,
   type Dashboard as Data,
   type InsightsData,
   type RunningExtras,
@@ -23,6 +24,10 @@ async function LiveDashboard({ searchParams }: { searchParams: PageProps<"/">["s
   await requireUnlocked();
   if (!(await isConnected())) redirect("/login");
   const range = parseRange((await searchParams).range);
+
+  // Keep the stored history current even without the daily cron (and backfill
+  // it after the first sign-in). Runs after the response, so it never slows the page.
+  after(syncHistoryIfBehind);
 
   // History is optional: if it fails, the charts say so and today still shows.
   const trendsP: Promise<Trends> = getGarminTrends(range).catch((err) => ({

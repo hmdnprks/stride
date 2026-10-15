@@ -3,6 +3,7 @@ import "server-only";
 import { savedClient } from "./auth";
 import { mapRun } from "./map";
 import type { DailyRaw, Range, Run, Trends } from "./types";
+import { loadHistory } from "./store";
 import { addDays, buildTrends, eachDay, isoDate, LOAD_WARMUP_DAYS, rangeWindow } from "../trends";
 
 // History for the trend charts, from the unofficial Connect endpoints the
@@ -13,6 +14,8 @@ import { addDays, buildTrends, eachDay, isoDate, LOAD_WARMUP_DAYS, rangeWindow }
 const API = "https://connectapi.garmin.com";
 const CHUNK_DAYS = 28;
 const CONCURRENCY = 4;
+/** Longest span the race-predictor endpoint accepts. */
+const RACE_SPAN_DAYS = 365;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Json = any;
@@ -49,6 +52,30 @@ function batteryLevel(sample: unknown) {
   return typeof level === "number" ? level : null;
 }
 
+/** A day with no readings yet. */
+export function emptyDay(date: string): DailyRaw {
+  return {
+    date,
+    bbHigh: null,
+    bbLow: null,
+    sleepScore: null,
+    sleepSec: null,
+    deepSec: null,
+    lightSec: null,
+    remSec: null,
+    awakeSec: null,
+    restingHr: null,
+    hrv: null,
+    hrvLow: null,
+    hrvHigh: null,
+    vo2: null,
+    pred5k: null,
+    pred10k: null,
+    predHalf: null,
+    predMarathon: null,
+  };
+}
+
 export interface History {
   daily: DailyRaw[];
   /** Runs from LOAD_WARMUP_DAYS before `from`, so load figures are warm. */
@@ -59,7 +86,7 @@ export interface History {
 export async function getLiveTrends(range: Range): Promise<Trends> {
   const today = isoDate(new Date());
   const { from, to } = rangeWindow(range, today);
-  const h = await fetchHistory(from, to);
+  const h = await loadHistory(from, to);
   return buildTrends(range, h.daily, h.runs, h.warnings, today);
 }
 
@@ -73,31 +100,7 @@ export async function fetchHistory(from: string, to: string): Promise<History> {
   const windows = chunks(from, to);
   const warnings: string[] = [];
 
-  const days = new Map<string, DailyRaw>(
-    eachDay(from, to).map((date) => [
-      date,
-      {
-        date,
-        bbHigh: null,
-        bbLow: null,
-        sleepScore: null,
-        sleepSec: null,
-        deepSec: null,
-        lightSec: null,
-        remSec: null,
-        awakeSec: null,
-        restingHr: null,
-        hrv: null,
-        hrvLow: null,
-        hrvHigh: null,
-        vo2: null,
-        pred5k: null,
-        pred10k: null,
-        predHalf: null,
-        predMarathon: null,
-      },
-    ]),
-  );
+  const days = new Map<string, DailyRaw>(eachDay(from, to).map((date) => [date, emptyDay(date)]));
   const set = (date: string | undefined, patch: Partial<DailyRaw>) => {
     const day = date && days.get(date);
     if (day) Object.assign(day, patch);
@@ -204,18 +207,22 @@ export async function fetchHistory(from: string, to: string): Promise<History> {
     ),
 
     metric("Race predictor", async () => {
-      // One request for the whole range; Connect's own chart asks the same way.
-      const raw: Json[] = await get(`/metrics-service/metrics/racepredictions/daily/${user}`, {
-        fromCalendarDate: from,
-        toCalendarDate: to,
-      });
-      for (const r of raw ?? []) {
-        set(r?.calendarDate, {
-          pred5k: num(r?.time5K),
-          pred10k: num(r?.time10K),
-          predHalf: num(r?.timeHalfMarathon),
-          predMarathon: num(r?.timeMarathon),
+      // Connect's own chart asks for the whole range at once, but the
+      // endpoint rejects spans over a year, so longer ones go in pieces.
+      for (let start = from; start <= to; start = addDays(start, RACE_SPAN_DAYS)) {
+        const end = addDays(start, RACE_SPAN_DAYS - 1);
+        const raw: Json[] = await get(`/metrics-service/metrics/racepredictions/daily/${user}`, {
+          fromCalendarDate: start,
+          toCalendarDate: end < to ? end : to,
         });
+        for (const r of raw ?? []) {
+          set(r?.calendarDate, {
+            pred5k: num(r?.time5K),
+            pred10k: num(r?.time10K),
+            predHalf: num(r?.timeHalfMarathon),
+            predMarathon: num(r?.timeMarathon),
+          });
+        }
       }
     }),
 

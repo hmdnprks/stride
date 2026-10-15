@@ -4,7 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 // Small key-value store for everything Stride must remember between requests:
-// the Garmin session, goals, and a sign-in waiting for its verification code.
+// the Garmin session, goals, a sign-in waiting for its verification code, and
+// the stored daily history.
 //
 // - Deployed: Upstash Redis over its REST API (what Vercel's Redis/KV
 //   integration provides). Plain fetch, no client library.
@@ -93,12 +94,46 @@ export async function kvSet(key: string, value: unknown, ttlSeconds?: number) {
   writeFile(store);
 }
 
-export async function kvDel(key: string) {
+export async function kvDel(...keys: string[]) {
+  if (!keys.length) return;
   if (kvConfigured) {
-    await redis(["DEL", PREFIX + key]);
+    await redis(["DEL", ...keys.map((k) => PREFIX + k)]);
     return;
   }
   const store = readFile();
-  delete store[PREFIX + key];
+  for (const key of keys) delete store[PREFIX + key];
   writeFile(store);
+}
+
+/** Several values in one round trip; null for each missing key. */
+export async function kvGetMany<T>(keys: string[]): Promise<(T | null)[]> {
+  if (!keys.length) return [];
+  if (kvConfigured) {
+    const raw = await redis<(string | null)[]>(["MGET", ...keys.map((k) => PREFIX + k)]);
+    return keys.map((_, i) => (raw?.[i] == null ? null : (JSON.parse(raw[i]!) as T)));
+  }
+  return Promise.all(keys.map((k) => kvGet<T>(k)));
+}
+
+/** Store several values (no expiry) in one round trip. */
+export async function kvSetMany(entries: [key: string, value: unknown][]) {
+  if (!entries.length) return;
+  if (kvConfigured) {
+    await redis(["MSET", ...entries.flatMap(([k, v]) => [PREFIX + k, JSON.stringify(v)])]);
+    return;
+  }
+  const store = readFile();
+  for (const [k, v] of entries) store[PREFIX + k] = { value: v, expires: null };
+  writeFile(store);
+}
+
+/** Set `key` only if it's absent, for `ttlSeconds`. True when this call claimed it (a simple lock). */
+export async function kvClaim(key: string, ttlSeconds: number): Promise<boolean> {
+  if (kvConfigured) return (await redis<string>(["SET", PREFIX + key, "1", "NX", "EX", ttlSeconds])) === "OK";
+  const store = readFile();
+  const held = store[PREFIX + key];
+  if (held && (held.expires === null || held.expires > Date.now())) return false;
+  store[PREFIX + key] = { value: 1, expires: Date.now() + ttlSeconds * 1000 };
+  writeFile(store);
+  return true;
 }

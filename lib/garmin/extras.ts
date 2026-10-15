@@ -1,7 +1,7 @@
 import "server-only";
 
 import { savedClient } from "./auth";
-import { mapRun } from "./map";
+import { loadHistory } from "./store";
 import type { Gear, HrZoneSettings, PersonalRecord, Run, RunningExtras } from "./types";
 import { buildCalendar, calendarStart, isoDate } from "../trends";
 
@@ -90,20 +90,9 @@ export async function getLiveExtras(): Promise<RunningExtras> {
     }),
 
     section<Run[]>("Training calendar", [], async () => {
-      const PAGE = 100;
-      let all: Run[] = [];
-      for (let start = 0; ; start += PAGE) {
-        const page: Json[] = await get(`/activitylist-service/activities/search/activities`, {
-          start,
-          limit: PAGE,
-          activityType: "running",
-          startDate: calendarStart(today),
-          endDate: today,
-        });
-        all = all.concat((page ?? []).map(mapRun));
-        if (!page || page.length < PAGE) break;
-      }
-      return all;
+      const h = await loadHistory(calendarStart(today), today);
+      warnings.push(...h.warnings.filter((w) => w.startsWith("Runs")).map((w) => `Training calendar: ${w}`));
+      return h.runs;
     }),
 
     section<HrZoneSettings | null>("Heart-rate zones", null, async () => {

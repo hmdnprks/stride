@@ -20,19 +20,22 @@ Garmin doesn't offer a public API for personal accounts (the official Health API
 - Your password is sent only to Garmin and never saved. The OAuth session tokens are saved to `.garmin-tokens/` (git-ignored) and last about a year.
 - **Sign out of Garmin** in the page footer deletes the tokens.
 - Data is cached for 15 minutes. Signing in or out clears the cache.
+- Finished days are stored, so charts don't re-download your history on every load. After you sign in, Stride saves a little over a year of daily readings and runs in the background. Each sync then adds the days since the last one and re-fetches the last week, in case your watch uploaded late. Pages read stored days from the database and fetch only the last few days from Garmin. Signing out deletes the stored history.
 - Garmin can change these endpoints at any time. Each section loads on its own, so if one breaks, only that card shows "no data", and the reason is listed in the page footer.
 - This is built for running on your own computer. The dashboard has no access control of its own, so don't deploy it publicly as is.
 
 ## Deploying
 
-Stride is built for one person. Deployed, it needs three things a laptop doesn't:
+Stride is built for one person. Deployed, it needs these, which a laptop doesn't:
 
-1. **A database** for your Garmin session, goals and sign-ins waiting for a verification code. Serverless hosts (Vercel, AWS Lambda) have a read-only disk. Stride uses Upstash Redis over its REST API (no extra package). Set either pair:
+1. **A database** for your Garmin session, goals, stored history and sign-ins waiting for a verification code. Serverless hosts (Vercel, AWS Lambda) have a read-only disk. Stride uses Upstash Redis over its REST API (no extra package). Set either pair:
    - `KV_REST_API_URL` and `KV_REST_API_TOKEN` (added automatically by Vercel's Upstash/Redis integration), or
    - `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
 2. **A password** in front of the whole site: `STRIDE_PASSWORD`. Without it, a deployed Stride stays locked rather than exposing your health data. Use a long, random password; changing it signs every browser out.
 
 3. **Your time zone**: `STRIDE_TIMEZONE`, as an IANA name such as `Asia/Jakarta`. Servers run in UTC, so without it "today", weeks, months and the "Synced at" time follow UTC instead of your local time.
+
+4. **A cron secret** for the daily history sync: `CRON_SECRET`, any long random value. `vercel.json` has Vercel call `/api/sync` once a day at 20:00 UTC (03:00 in Jakarta), sending this secret. Without it the endpoint refuses every call. The sync also runs after a page load whenever the stored history is behind, so the cron is a backstop rather than a requirement. The free Hobby plan allows one cron run a day, which is enough.
 
 Then redeploy, open the site, enter the password, and sign in to Garmin.
 
@@ -66,6 +69,8 @@ components/login-form.tsx  Sign-in and verification code form
 lib/garmin/auth.ts         Garmin SSO sign-in (incl. MFA), token storage
 lib/garmin/live.ts         Garmin Connect fetcher (today)
 lib/garmin/history.ts      Garmin Connect history for the trend charts
+lib/garmin/store.ts        Stored daily history: sync, backfill, store + live reads
+app/api/sync/route.ts      Daily cron sync (CRON_SECRET)
 lib/garmin/extras.ts       Personal records, shoes, the year calendar
 lib/garmin/activity.ts     One activity: streams, GPS route, laps
 lib/garmin/map.ts          Connect activity → Run mapping

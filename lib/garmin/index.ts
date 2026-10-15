@@ -2,7 +2,8 @@ import "server-only";
 
 import { cacheLife, cacheTag } from "next/cache";
 import { getLiveDashboard } from "./live";
-import { fetchHistory, getLiveTrends } from "./history";
+import { getLiveTrends } from "./history";
+import { loadHistory } from "./store";
 import { addDays, isoDate } from "../trends";
 import { getLiveExtras } from "./extras";
 import { getLiveActivity } from "./activity";
@@ -11,6 +12,7 @@ import type { Range } from "./types";
 export type * from "./types";
 export { getDemoDashboard } from "./demo";
 export { isConnected } from "./auth";
+export { clearHistory, syncHistory, syncHistoryIfBehind } from "./store";
 
 export const GARMIN_CACHE_TAG = "garmin";
 
@@ -60,5 +62,5 @@ export async function getGarminInsightsData() {
   cacheLife({ stale: 300, revalidate: 900, expire: 3600 });
   const today = isoDate(new Date());
   // Runs come back with a 4-week warm-up before the window, so load ratios work.
-  return fetchHistory(addDays(today, -89), today);
+  return loadHistory(addDays(today, -89), today);
 }

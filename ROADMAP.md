@@ -61,8 +61,8 @@ Notes:
 
 - [x] Manual refresh: the Sync button clears the 15-minute cache
 - [x] App password (`STRIDE_PASSWORD`) so it can be deployed beyond localhost
-- [ ] Daily snapshots in the database (Upstash Redis), so history survives Garmin API changes and loads instantly
-- [ ] Background sync (cron) that keeps the snapshots up to date instead of fetching on page load
+- [x] Daily snapshots in the database (Upstash Redis): about 400 days backfilled, then pages read finished days from the store and only the last few from Garmin
+- [x] Background sync: a daily Vercel Cron (`/api/sync`), plus a sync after any page load that finds the store behind
 - [ ] PWA / home-screen install
 - [ ] Export to CSV
 

@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { refresh, updateTag } from "next/cache";
 import { disconnect, signIn, verifyMfa, type SignInResult } from "@/lib/garmin/auth";
-import { GARMIN_CACHE_TAG, type DataSource } from "@/lib/garmin";
+import { clearHistory, GARMIN_CACHE_TAG, type DataSource } from "@/lib/garmin";
 import { assertUnlocked } from "@/lib/gate-server";
 import { saveSettings } from "@/lib/settings";
 
@@ -76,6 +76,7 @@ async function verifyMfaStep(prev: SignInState, form: FormData): Promise<SignInS
 export async function signOutAction() {
   await assertUnlocked();
   await disconnect();
+  await clearHistory();
   updateTag(GARMIN_CACHE_TAG);
   redirect("/login");
 }

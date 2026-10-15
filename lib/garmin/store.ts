@@ -1,0 +1,225 @@
+import "server-only";
+
+import { kvClaim, kvDel, kvGet, kvGetMany, kvSetMany, kvSet } from "../kv";
+import { emptyDay, fetchHistory, type History } from "./history";
+import type { DailyRaw, Run } from "./types";
+import { addDays, eachDay, isoDate, LOAD_WARMUP_DAYS } from "../trends";
+
+// Stored daily history, so charts read finished days from the database and
+// only ask Garmin for the last few. One key per month holds that month's
+// daily readings and runs; a meta key says which days are covered.
+//
+// A sync (daily cron, or after a page load when the store is behind) fetches
+// from the last stored day to yesterday, and re-fetches the last week each
+// time so data a watch uploads late still lands. The first sync backfills a
+// little over a year: enough for the 1Y charts and their load warm-up.
+
+const META_KEY = "history:meta";
+const LOCK_KEY = "history:lock";
+const monthKey = (month: string) => `history:${month}`;
+
+/** First sync covers this many days, so 1Y (Monday-aligned, plus load warm-up) is complete. */
+const BACKFILL_DAYS = 400;
+/** Every sync re-fetches this many recent days, for late watch uploads. */
+const REFETCH_DAYS = 7;
+/** Pages always fetch at least the last few days live (today included). */
+const LIVE_DAYS = 3;
+/** A failing sync is retried this many times before its gaps are accepted. */
+const MAX_ATTEMPTS = 3;
+/** Don't retry a failed sync from page loads more often than this. */
+const RETRY_AFTER_MS = 60 * 60 * 1000;
+/** Long enough for a full backfill; released early when the sync ends. */
+const LOCK_SECONDS = 300;
+
+interface Month {
+  days: DailyRaw[];
+  runs: Run[];
+}
+
+export interface HistoryMeta {
+  /** Stored days run from `from` to `through` (runs from LOAD_WARMUP_DAYS earlier); null until the backfill succeeds. */
+  from: string | null;
+  through: string | null;
+  /** When the last sync finished (ISO), and how it went. */
+  syncedAt: string;
+  attempts: number;
+  lastError: string | null;
+}
+
+const runDate = (r: Run) => r.startLocal.slice(0, 10);
+const min = (a: string, b: string) => (a < b ? a : b);
+const max = (a: string, b: string) => (a > b ? a : b);
+
+function monthsBetween(from: string, to: string) {
+  const out: string[] = [];
+  for (let m = from.slice(0, 7); m <= to.slice(0, 7); ) {
+    out.push(m);
+    const [y, mo] = m.split("-").map(Number);
+    m = mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, "0")}`;
+  }
+  return out;
+}
+
+/** Fill gaps in `base` with `next`'s readings; a reading that's missing in `next` keeps the old one. */
+function mergeDay(base: DailyRaw | undefined, next: DailyRaw): DailyRaw {
+  if (!base) return next;
+  const out = { ...base };
+  for (const [k, v] of Object.entries(next) as [keyof DailyRaw, DailyRaw[keyof DailyRaw]][]) {
+    if (v !== null) Object.assign(out, { [k]: v });
+  }
+  return out;
+}
+
+export function getHistoryMeta() {
+  return kvGet<HistoryMeta>(META_KEY);
+}
+
+async function readMonths(from: string, to: string) {
+  const months = monthsBetween(from, to);
+  const stored = await kvGetMany<Month>(months.map(monthKey));
+  return new Map(months.map((m, i) => [m, stored[i] ?? { days: [], runs: [] }]));
+}
+
+/**
+ * Write fetched days and runs into the store. Days merge with what's there;
+ * runs inside the fetched window replace the stored ones, so a run deleted
+ * in Garmin Connect disappears too (unless the run list itself failed).
+ */
+async function writeHistory(h: History, from: string, through: string, runsOk: boolean) {
+  const runsFrom = addDays(from, -LOAD_WARMUP_DAYS);
+  const months = await readMonths(runsFrom, through);
+
+  for (const day of h.daily) {
+    if (day.date < from || day.date > through) continue;
+    const month = months.get(day.date.slice(0, 7))!;
+    const i = month.days.findIndex((d) => d.date === day.date);
+    if (i >= 0) month.days[i] = mergeDay(month.days[i], day);
+    else month.days.push(day);
+  }
+
+  if (runsOk) {
+    for (const month of months.values()) {
+      month.runs = month.runs.filter((r) => runDate(r) < runsFrom || runDate(r) > through);
+    }
+  }
+  for (const run of h.runs) {
+    const date = runDate(run);
+    if (date < runsFrom || date > through) continue;
+    const month = months.get(date.slice(0, 7))!;
+    month.runs = [...month.runs.filter((r) => r.id !== run.id), run];
+  }
+
+  for (const month of months.values()) {
+    month.days.sort((a, b) => a.date.localeCompare(b.date));
+    month.runs.sort((a, b) => a.startLocal.localeCompare(b.startLocal));
+  }
+  await kvSetMany([...months].map(([m, data]) => [monthKey(m), data]));
+}
+
+export type SyncResult =
+  | { status: "synced"; from: string; through: string; warnings: string[] }
+  | { status: "retrying"; attempts: number; warnings: string[] }
+  | { status: "busy" };
+
+/**
+ * Bring the store up to yesterday. Only one sync runs at a time. If a metric
+ * fails, the fetched data is still saved but the covered range doesn't move,
+ * so the next sync tries the same days again (up to MAX_ATTEMPTS times).
+ */
+export async function syncHistory(): Promise<SyncResult> {
+  if (!(await kvClaim(LOCK_KEY, LOCK_SECONDS))) return { status: "busy" };
+  try {
+    const meta = await getHistoryMeta();
+    const today = isoDate(new Date());
+    const yesterday = addDays(today, -1);
+    const backfilled = Boolean(meta?.from && meta.through);
+    const from = backfilled
+      ? min(addDays(meta!.through!, 1), addDays(today, -REFETCH_DAYS))
+      : addDays(today, -BACKFILL_DAYS);
+
+    const h = await fetchHistory(from, yesterday);
+    const runsOk = !h.warnings.some((w) => w.startsWith("Runs"));
+    await writeHistory(h, from, yesterday, runsOk);
+
+    const attempts = (meta?.attempts ?? 0) + 1;
+    const now = new Date().toISOString();
+    if (h.warnings.length && attempts < MAX_ATTEMPTS) {
+      await kvSet(META_KEY, { ...(meta ?? { from: null, through: null }), syncedAt: now, attempts, lastError: h.warnings.join("; ") } satisfies HistoryMeta);
+      return { status: "retrying", attempts, warnings: h.warnings };
+    }
+
+    const covered = backfilled ? meta!.from! : from;
+    await kvSet(META_KEY, {
+      from: covered,
+      through: yesterday,
+      syncedAt: now,
+      attempts: 0,
+      lastError: h.warnings.length ? h.warnings.join("; ") : null,
+    } satisfies HistoryMeta);
+    return { status: "synced", from: covered, through: yesterday, warnings: h.warnings };
+  } finally {
+    await kvDel(LOCK_KEY);
+  }
+}
+
+/** Sync if the store is missing or behind, unless a failed sync was tried within the hour. */
+export async function syncHistoryIfBehind() {
+  const meta = await getHistoryMeta();
+  const yesterday = addDays(isoDate(new Date()), -1);
+  if (meta?.through && meta.through >= yesterday) return;
+  if (meta?.attempts && Date.now() - Date.parse(meta.syncedAt) < RETRY_AFTER_MS) return;
+  try {
+    await syncHistory();
+  } catch (err) {
+    console.warn(`Stride history sync failed: ${err instanceof Error ? err.message : err}`);
+  }
+}
+
+/**
+ * Daily readings for `from`..`to` and runs from LOAD_WARMUP_DAYS earlier, like
+ * fetchHistory: finished days from the store, recent ones from Garmin. Falls
+ * back to fetching everything when the store doesn't cover the window.
+ */
+export async function loadHistory(from: string, to: string): Promise<History> {
+  const meta = await getHistoryMeta();
+  if (!meta?.from || !meta.through || from < meta.from) return fetchHistory(from, to);
+
+  const today = isoDate(new Date());
+  const liveFrom = max(from, min(addDays(meta.through, 1), addDays(today, -(LIVE_DAYS - 1))));
+  const storedTo = min(to, addDays(liveFrom, -1));
+  const runsFrom = addDays(from, -LOAD_WARMUP_DAYS);
+
+  const [months, live] = await Promise.all([
+    readMonths(runsFrom, max(runsFrom, storedTo)),
+    liveFrom <= to ? fetchHistory(liveFrom, to) : null,
+  ]);
+
+  const storedDays = new Map<string, DailyRaw>();
+  const runs = new Map<string, Run>();
+  for (const month of months.values()) {
+    for (const d of month.days) storedDays.set(d.date, d);
+    for (const r of month.runs) if (runDate(r) >= runsFrom && runDate(r) <= storedTo) runs.set(r.id, r);
+  }
+  const liveDays = new Map(live?.daily.map((d) => [d.date, d]));
+  for (const r of live?.runs ?? []) if (runDate(r) >= runsFrom && runDate(r) <= to) runs.set(r.id, r);
+
+  const daily = eachDay(from, to).map((date) => {
+    const fresh = liveDays.get(date);
+    const kept = storedDays.get(date);
+    return fresh ? mergeDay(kept, fresh) : (kept ?? emptyDay(date));
+  });
+
+  return {
+    daily,
+    runs: [...runs.values()].sort((a, b) => a.startLocal.localeCompare(b.startLocal)),
+    warnings: live?.warnings ?? [],
+  };
+}
+
+/** Forget the stored history (on sign-out, so another account starts fresh). */
+export async function clearHistory() {
+  const meta = await getHistoryMeta();
+  const today = isoDate(new Date());
+  const first = addDays(meta?.from ?? addDays(today, -BACKFILL_DAYS), -LOAD_WARMUP_DAYS);
+  await kvDel(META_KEY, LOCK_KEY, ...monthsBetween(first, today).map(monthKey));
+}
