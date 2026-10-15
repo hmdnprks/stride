@@ -72,6 +72,7 @@ function demoRuns(today: Date, rand: () => number): Run[] {
       avgHr: Math.round(lerp(t.hr) + (back / 365) * 4),
       elevationGainM: Math.round(lerp([20, 140])),
       load: Math.round(((distanceM / 1000) * pace * t.intensity) / 60),
+      loadEstimated: false,
       ...demoDynamics(pace, Math.round((distanceM / 1000) * pace), t.zones),
     });
   }

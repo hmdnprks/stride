@@ -169,12 +169,16 @@ export function FitnessTrends({ trends }: { trends: Trends }) {
         : `${v1 > v0 ? "Up" : "Down"} ${Math.abs(v1 - v0).toFixed(1)} over this range.`
       : undefined;
 
-  const loadSummary =
+  const loadRatio =
     ratio === null
-      ? undefined
+      ? null
       : `This week's load is ${ratio.toFixed(1)}× your 4-week average. ${
           ratio < 0.8 ? "You're training less than usual." : ratio > 1.3 ? "That's a big jump; watch for fatigue." : "That's a sustainable build."
         }`;
+  const loadSummary =
+    [loadRatio, trends.loadEstimated && "Estimated from time in heart-rate zones, since your watch doesn't report training load."]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
   return (
     <Section title={`Fitness over ${RANGE_LABELS[trends.range]}`}>

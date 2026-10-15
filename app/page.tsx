@@ -35,6 +35,7 @@ async function LiveDashboard({ searchParams }: { searchParams: PageProps<"/">["s
     bucket: "day" as const,
     points: [],
     runs: [],
+    loadEstimated: false,
     warnings: [`history: ${err instanceof Error ? err.message : "failed"}`],
   }));
 

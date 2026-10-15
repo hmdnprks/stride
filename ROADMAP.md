@@ -71,8 +71,13 @@ Dropped:
 - Unit toggle (km ↔ miles): Stride is metric only
 - Strava import
 
-## Ideas backlog
+## 🚧 Phase 6 — Looking back
 
-- Weather overlay on runs (heat and humidity vs. pace)
-- Year-in-review page
-- Shareable image card for a run or a week
+- [x] Training load estimate for watches that don't report one: weighted minutes in each heart-rate zone (Edwards TRIMP), labelled as estimated wherever it shows
+- [ ] Year in review (`/review/[year]`): totals, biggest week and month, longest run, records set that year, and how VO2 max, resting heart rate and HRV changed
+- [ ] Shareable image card for a run or a week, in the watch-face style, sized for stories and chats
+- [ ] Weather on runs: temperature, humidity and dew point at the start of each run (Open-Meteo, no key), and pace against heat
+
+Notes:
+
+- Some Garmin watches (including the one this was built against) report Training Effect but not per-run training load, and Garmin's training-status endpoint returns nothing for them. Every run still has heart-rate zone times, so Stride can estimate load from those.

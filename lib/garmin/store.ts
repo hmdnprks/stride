@@ -2,6 +2,7 @@ import "server-only";
 
 import { kvClaim, kvDel, kvGet, kvGetMany, kvSetMany, kvSet } from "../kv";
 import { emptyDay, fetchHistory, type History } from "./history";
+import { withLoad } from "./map";
 import type { DailyRaw, Run } from "./types";
 import { addDays, eachDay, isoDate, LOAD_WARMUP_DAYS } from "../trends";
 
@@ -77,7 +78,12 @@ export function getHistoryMeta() {
 async function readMonths(from: string, to: string) {
   const months = monthsBetween(from, to);
   const stored = await kvGetMany<Month>(months.map(monthKey));
-  return new Map(months.map((m, i) => [m, stored[i] ?? { days: [], runs: [] }]));
+  return new Map(
+    months.map((m, i) => {
+      const month = stored[i] ?? { days: [], runs: [] };
+      return [m, { ...month, runs: month.runs.map(withLoad) }];
+    }),
+  );
 }
 
 /**

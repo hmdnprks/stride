@@ -166,7 +166,8 @@ export function buildTrends(range: Range, daily: DailyRaw[], runs: Run[], warnin
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  return { range, bucket, points, runs: runPoints, warnings };
+  const loadEstimated = runs.some((r) => r.loadEstimated && r.startLocal.slice(0, 10) <= to);
+  return { range, bucket, points, runs: runPoints, loadEstimated, warnings };
 }
 
 export function parseRange(value: unknown): Range {

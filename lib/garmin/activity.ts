@@ -1,6 +1,7 @@
 import "server-only";
 
 import { savedClient } from "./auth";
+import { withLoad } from "./map";
 import type { ActivityDetail, ActivitySample, Run, Split } from "./types";
 
 // One run in full: summary, per-sample streams, GPS polyline and laps.
@@ -22,6 +23,9 @@ export async function getLiveActivity(id: string): Promise<ActivityDetail | null
   const get = (url: string) => gc.get<Json>(`${API}${url}`);
   const warnings: string[] = [];
 
+  // Zone times aren't in the summary; fetched alongside it for the load estimate.
+  const zonesReq: Promise<Json[] | null> = get(`/activity-service/activity/${id}/hrTimeInZones`).catch(() => null);
+
   let summary: Json;
   try {
     summary = await get(`/activity-service/activity/${id}`);
@@ -31,7 +35,10 @@ export async function getLiveActivity(id: string): Promise<ActivityDetail | null
   if (!summary?.summaryDTO) return null;
   const s = summary.summaryDTO;
 
-  const run: Run = {
+  const zones = await zonesReq;
+  const zoneSecs = [1, 2, 3, 4, 5].map((z) => num(zones?.find((x: Json) => x?.zoneNumber === z)?.secsInZone));
+
+  const run: Run = withLoad({
     id,
     name: summary.activityName ?? "Run",
     startLocal: String(s.startTimeLocal ?? "").replace("T", " ").slice(0, 19),
@@ -40,12 +47,12 @@ export async function getLiveActivity(id: string): Promise<ActivityDetail | null
     avgHr: num(s.averageHR),
     elevationGainM: num(s.elevationGain),
     load: num(s.activityTrainingLoad),
-    hrZones: null,
+    hrZones: zoneSecs.every((z) => z !== null) ? (zoneSecs as Run["hrZones"]) : null,
     cadenceSpm: spm(num(s.averageRunCadence)),
     strideCm: num(s.strideLength),
     groundContactMs: num(s.groundContactTime),
     verticalRatioPct: num(s.verticalRatio),
-  };
+  });
 
   const [details, laps] = await Promise.all([
     get(`/activity-service/activity/${id}/details?maxChartSize=2000&maxPolylineSize=4000`).catch((err) => {

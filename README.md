@@ -21,6 +21,7 @@ Garmin doesn't offer a public API for personal accounts (the official Health API
 - **Sign out of Garmin** in the page footer deletes the tokens.
 - Data is cached for 15 minutes. Signing in or out clears the cache.
 - Finished days are stored, so charts don't re-download your history on every load. After you sign in, Stride saves a little over a year of daily readings and runs in the background. Each sync then adds the days since the last one and re-fetches the last week, in case your watch uploaded late. Pages read stored days from the database and fetch only the last few days from Garmin. Signing out deletes the stored history.
+- Training load comes from Garmin when the watch reports it. Some watches don't (they give Training Effect only), so Stride estimates it from time in each heart-rate zone, weighted 1 to 5. Estimated figures are labelled as such on the charts, the run page and in the export.
 - Garmin can change these endpoints at any time. Each section loads on its own, so if one breaks, only that card shows "no data", and the reason is listed in the page footer.
 - Deployed, the whole site sits behind a password (see Deploying).
 

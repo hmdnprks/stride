@@ -61,8 +61,10 @@ export interface Run {
   durationSec: number;
   avgHr: number | null;
   elevationGainM: number | null;
-  /** Garmin's per-activity training load (EPOC-based). */
+  /** Garmin's per-activity training load (EPOC-based), or an estimate when the watch doesn't report one. */
   load: number | null;
+  /** True when `load` is estimated from time in heart-rate zones rather than reported by Garmin. */
+  loadEstimated: boolean;
   /** Seconds in heart-rate zones 1–5, or null when unknown. */
   hrZones: [number, number, number, number, number] | null;
   /** Running dynamics averages (null when the watch didn't record them). */
@@ -175,6 +177,8 @@ export interface Trends {
   points: TrendPoint[];
   /** Runs in range with heart rate, for pace vs heart rate. */
   runs: RunPoint[];
+  /** Some runs in range use an estimated load (see Run.loadEstimated). */
+  loadEstimated: boolean;
   warnings: string[];
 }
 
