@@ -59,14 +59,17 @@ Notes:
 
 ## Phase 5 — Platform
 
-- [ ] Local database (SQLite) to store daily snapshots, so history survives Garmin API changes and loads instantly
-- [ ] Background sync (cron) instead of fetching on page load
-- [ ] Manual refresh button that bypasses the 15-minute cache
-- [ ] Unit toggle: km ↔ miles
-- [ ] Export to CSV
-- [ ] Optional Strava import for activities
-- [ ] App password / access control so it can be deployed beyond localhost
+- [x] Manual refresh: the Sync button clears the 15-minute cache
+- [x] App password (`STRIDE_PASSWORD`) so it can be deployed beyond localhost
+- [ ] Daily snapshots in the database (Upstash Redis), so history survives Garmin API changes and loads instantly
+- [ ] Background sync (cron) that keeps the snapshots up to date instead of fetching on page load
 - [ ] PWA / home-screen install
+- [ ] Export to CSV
+
+Dropped:
+
+- Unit toggle (km ↔ miles): Stride is metric only
+- Strava import
 
 ## Ideas backlog
 
