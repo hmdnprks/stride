@@ -379,7 +379,15 @@ export function RunsView({ data, trends, extras }: { data: Dashboard; trends: Tr
         )}
       </section>
 
-      <CalendarHeatmap days={extras.calendar} />
+      <div className="flex flex-col gap-4">
+        <CalendarHeatmap days={extras.calendar} />
+        <Link
+          href={`${data.source === "demo" ? "/demo" : ""}/review/${new Date().getFullYear()}`}
+          className="self-start text-sm font-semibold text-primary underline-offset-4 hover:underline"
+        >
+          Your {new Date().getFullYear()} in review
+        </Link>
+      </div>
 
       <div className="grid gap-12 md:grid-cols-2 md:gap-14">
         <section className="flex flex-col gap-4">

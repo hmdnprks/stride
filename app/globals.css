@@ -149,6 +149,17 @@ body {
   }
 }
 
+/* Year in review: the lap draws in once, alongside the figures charging. */
+.lap {
+  animation: lap 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.15s backwards;
+}
+
+@keyframes lap {
+  from {
+    stroke-dasharray: 0 1;
+  }
+}
+
 .wide {
   font-variation-settings: "wdth" 125;
   letter-spacing: -0.02em;

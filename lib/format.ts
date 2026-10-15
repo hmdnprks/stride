@@ -6,8 +6,10 @@ export function km(meters: number, digits = 1) {
 
 /** 7h 42m */
 export function hm(seconds: number) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.round((seconds % 3600) / 60);
+  // Round to whole minutes first, so 1h 59m 40s reads 2h 0m rather than 1h 60m.
+  const total = Math.round(seconds / 60);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
   return h ? `${h}h ${m}m` : `${m}m`;
 }
 

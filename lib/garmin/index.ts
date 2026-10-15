@@ -3,7 +3,8 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { getLiveDashboard } from "./live";
 import { getLiveTrends } from "./history";
-import { loadHistory } from "./store";
+import { getHistoryMeta, loadHistory } from "./store";
+import { buildReview, reviewYears } from "../review";
 import { addDays, isoDate } from "../trends";
 import { getLiveExtras } from "./extras";
 import { getLiveActivity } from "./activity";
@@ -37,7 +38,7 @@ export async function getGarminTrends(range: Range) {
   return getLiveTrends(range);
 }
 
-export { getDemoActivity, getDemoExtras, getDemoHistory, getDemoInsightsData } from "./demo";
+export { getDemoActivity, getDemoExtras, getDemoHistory, getDemoInsightsData, getDemoReview } from "./demo";
 
 /** All-time records, shoes and the year calendar; cleared by Sync. */
 export async function getGarminExtras() {
@@ -63,4 +64,27 @@ export async function getGarminInsightsData() {
   const today = isoDate(new Date());
   // Runs come back with a 4-week warm-up before the window, so load ratios work.
   return loadHistory(addDays(today, -89), today);
+}
+
+/**
+ * The year in review, or null for a year outside stored history. Before the
+ * first sync, history is treated as the last year (fetched live).
+ */
+export async function getGarminReview(year: number) {
+  "use cache";
+  cacheTag(GARMIN_CACHE_TAG);
+  cacheLife({ stale: 300, revalidate: 900, expire: 3600 });
+  const today = isoDate(new Date());
+  const historyFrom = (await getHistoryMeta())?.from ?? addDays(today, -364);
+  const years = reviewYears(historyFrom, today);
+  if (!years.includes(year)) return null;
+
+  const from = historyFrom > `${year}-01-01` ? historyFrom : `${year}-01-01`;
+  const to = today < `${year}-12-31` ? today : `${year}-12-31`;
+  const [history, extras] = await Promise.all([loadHistory(from, to), getGarminExtras()]);
+  return {
+    review: buildReview(year, history.daily, history.runs, extras.records, { from, today }),
+    years,
+    warnings: [...history.warnings, ...extras.warnings],
+  };
 }

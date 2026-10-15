@@ -1,5 +1,6 @@
 import type { ActivityDetail, ActivitySample, DailyRaw, Dashboard, InsightsData, Range, Run, RunningExtras, Split, Trends } from "./types";
 import { addDays, buildCalendar, buildTrends, eachDay, isoDate, rangeWindow } from "../trends";
+import { buildReview, reviewYears } from "../review";
 
 // Deterministic sample data so the dashboard looks real without a Garmin login.
 
@@ -298,6 +299,16 @@ export function getDemoHistory(days: number) {
   const from = addDays(today, -(days - 1));
   const daily = eachDay(from, today).map((date, i, all) => demoDay(date, all.length - 1 - i));
   return { daily, runs: demoRuns(new Date(), seeded(20261009)) };
+}
+
+/** The demo year in review; demo history covers the last 400 days. */
+export function getDemoReview(year: number) {
+  const today = isoDate(new Date());
+  const historyFrom = addDays(today, -399);
+  const years = reviewYears(historyFrom, today);
+  if (!years.includes(year)) return null;
+  const { daily, runs } = getDemoHistory(400);
+  return { review: buildReview(year, daily, runs, getDemoExtras().records, { from: historyFrom, today }), years, warnings: [] };
 }
 
 /* ---------- Insights ---------- */

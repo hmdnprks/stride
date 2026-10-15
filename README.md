@@ -42,6 +42,10 @@ Then redeploy, open the site, enter the password, and sign in to Garmin.
 
 Locally, neither is required: with no database configured, data is kept in `.stride/kv.json` (git-ignored), and with no password set in development the site stays open.
 
+## Year in review
+
+`/review/2026` (also in the account menu, and under the training calendar) reads a year like a race result. The year's distance sits on the watch-face panel next to a track drawn as far as the year has gone. Below it: each month as a split, the longest and fastest runs, the biggest week, how many weeks had a run, the records set that year that still stand, and how VO2 max, resting heart rate, HRV and sleep score moved from the first month to the latest. Years before Stride's stored history begins aren't available; a year that starts partway through says from when it counts.
+
 ## Export
 
 The account menu has **Export runs (CSV)** and **Export daily readings (CSV)**: everything stored, about 400 days once synced, newest first. Metric units are named in the headers, and each run links to Garmin Connect. Durations, paces and race predictions are written as `h:mm:ss`, so spreadsheets don't read 21:45 as a time of day. On the demo dashboard the same items export the demo data.
@@ -85,6 +89,8 @@ lib/garmin/live.ts         Garmin Connect fetcher (today)
 lib/garmin/history.ts      Garmin Connect history for the trend charts
 lib/garmin/store.ts        Stored daily history: sync, backfill, store + live reads
 lib/export.ts              CSV for runs and daily readings
+lib/review.ts              Year in review: monthly splits, highlights, body changes
+app/review/[year]          Year in review page (demo: app/demo/review/[year])
 app/api/export/[kind]      CSV downloads (account menu)
 app/api/sync/route.ts      Daily cron sync (CRON_SECRET)
 app/manifest.ts            Web app manifest (icons from app/pwa/[file], app/apple-icon.tsx)

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useOffline } from "next/offline";
 import { useDeferredValue, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Csv01Icon, HeartCheckIcon, Link01Icon, Logout03Icon, RunningShoesIcon, Sun03Icon, Target01Icon } from "@hugeicons/core-free-icons";
+import { Award01Icon, Csv01Icon, HeartCheckIcon, Link01Icon, Logout03Icon, RunningShoesIcon, Sun03Icon, Target01Icon } from "@hugeicons/core-free-icons";
 import { signOutAction, syncAction } from "@/app/actions";
 import type { Range } from "@/lib/garmin/types";
 import { EXPORTS, type ExportKind } from "@/lib/export";
@@ -87,9 +87,16 @@ function AccountMenu({ name, live }: { name: string; live: boolean }) {
     icon: Csv01Icon,
     onSelect: download(kind),
   }));
+  const year = new Date().getFullYear();
+  const review: DropdownItem = {
+    id: "review",
+    label: `${year} in review`,
+    icon: Award01Icon,
+    onSelect: () => router.push(`${live ? "" : "/demo"}/review/${year}`),
+  };
   const items: DropdownItem[] = live
-    ? [...exports, { id: "signout", label: "Sign out of Garmin", icon: Logout03Icon, onSelect: () => void signOutAction() }]
-    : [...exports, { id: "connect", label: "Connect Garmin", icon: Link01Icon, onSelect: () => router.push("/login") }];
+    ? [review, ...exports, { id: "signout", label: "Sign out of Garmin", icon: Logout03Icon, onSelect: () => void signOutAction() }]
+    : [review, ...exports, { id: "connect", label: "Connect Garmin", icon: Link01Icon, onSelect: () => router.push("/login") }];
 
   return (
     <SmoothDropdown
