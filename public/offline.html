@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stride · Offline</title>
+<style>
+  :root { --bg: #ffffff; --fg: #000000; --muted: #57617d; --panel: #1f47f5; --panel-fg: #ffffff; --panel-muted: #b9c7ff; }
+  :root[data-theme="dark"] { --bg: #040a1e; --fg: #f3f6ff; --muted: #8c99bd; --panel: #1a3ad6; --panel-muted: #aebcff; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: Archivo, "Helvetica Neue", Arial, system-ui, sans-serif;
+    display: flex; flex-direction: column; padding: 16px;
+  }
+  header { font-weight: 800; font-size: 18px; font-stretch: 125%; padding: 8px 0 24px; display: flex; align-items: center; gap: 10px; }
+  header svg { width: 28px; height: 28px; }
+  main { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .panel {
+    background: var(--panel); color: var(--panel-fg); border-radius: 2rem;
+    width: 100%; max-width: 560px; padding: 40px 32px;
+  }
+  .label { color: var(--panel-muted); font-size: 14px; font-weight: 600; margin: 0 0 12px; }
+  h1 { font-size: 38px; line-height: 1.05; font-weight: 800; font-stretch: 125%; margin: 0 0 16px; }
+  p { font-size: 16px; line-height: 1.5; margin: 0 0 28px; color: var(--panel-muted); }
+  button {
+    font: inherit; font-weight: 600; font-size: 14px; height: 44px; padding: 0 22px;
+    border-radius: 9999px; border: 0; background: var(--panel-fg); color: var(--panel); cursor: pointer;
+  }
+</style>
+<script>
+  try {
+    var t = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", t);
+  } catch (e) {}
+</script>
+</head>
+<body>
+  <header><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#1F47F5"/><rect x="170" y="226" width="172" height="60" rx="30" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="22"/><path d="M198 348A92 92 0 0 1 198 164H314A92 92 0 0 1 314 348H198" fill="none" stroke="#fff" stroke-width="40" stroke-linecap="round" stroke-dasharray="620 400"/></svg><span>Stride</span></header>
+  <main>
+    <section class="panel">
+      <p class="label">No connection</p>
+      <h1>You’re offline.</h1>
+      <p>Stride loads your runs and recovery from Garmin, so it needs a connection. This page reloads by itself when you’re back online.</p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </section>
+  </main>
+  <script>addEventListener("online", function () { location.reload(); });</script>
+</body>
+</html>

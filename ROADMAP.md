@@ -63,7 +63,7 @@ Notes:
 - [x] App password (`STRIDE_PASSWORD`) so it can be deployed beyond localhost
 - [x] Daily snapshots in the database (Upstash Redis): about 400 days backfilled, then pages read finished days from the store and only the last few from Garmin
 - [x] Background sync: a daily Vercel Cron (`/api/sync`), plus a sync after any page load that finds the store behind
-- [ ] PWA / home-screen install
+- [x] Home-screen install: manifest and track-mark icons, theme-coloured status bar, an offline page, and an "Offline" state in the header
 - [ ] Export to CSV
 
 Dropped:

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useOffline } from "next/offline";
 import { useDeferredValue, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { HeartCheckIcon, Link01Icon, Logout03Icon, RunningShoesIcon, Sun03Icon, Target01Icon } from "@hugeicons/core-free-icons";
@@ -41,6 +42,18 @@ function setView(v: View) {
 function SyncButton() {
   const [status, setStatus] = useState<ButtonStatus>("idle");
   const [, startTransition] = useTransition();
+  // Syncing can't reach Garmin offline; say so in the button's place.
+  if (useOffline()) {
+    return (
+      <span
+        role="status"
+        className="flex h-11 min-w-[104px] items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-muted-foreground outline outline-1 outline-dashed outline-border"
+      >
+        <span aria-hidden className="size-1.5 rounded-full bg-muted-foreground" />
+        Offline
+      </span>
+    );
+  }
   return (
     <StatusButton
       variant="quiet"
