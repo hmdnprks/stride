@@ -57,14 +57,14 @@ Notes:
 - Goals and the race are stored locally in `.stride/settings.json` (git-ignored), separately for demo and live data.
 - Taper length: 7 days up to 10K, 10 days for a half, 21 days for a marathon.
 
-## Phase 5 — Platform
+## ✅ Phase 5 — Platform (shipped)
 
 - [x] Manual refresh: the Sync button clears the 15-minute cache
 - [x] App password (`STRIDE_PASSWORD`) so it can be deployed beyond localhost
 - [x] Daily snapshots in the database (Upstash Redis): about 400 days backfilled, then pages read finished days from the store and only the last few from Garmin
 - [x] Background sync: a daily Vercel Cron (`/api/sync`), plus a sync after any page load that finds the store behind
 - [x] Home-screen install: manifest and track-mark icons, theme-coloured status bar, an offline page, and an "Offline" state in the header
-- [ ] Export to CSV
+- [x] Export to CSV: runs and daily readings, all stored history, from the account menu
 
 Dropped:
 

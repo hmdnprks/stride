@@ -291,6 +291,14 @@ export function getDemoActivity(id: string): ActivityDetail | null {
   };
 }
 
+/** Every demo day and run, for the CSV export. */
+export function getDemoHistory(days: number) {
+  const today = isoDate(new Date());
+  const from = addDays(today, -(days - 1));
+  const daily = eachDay(from, today).map((date, i, all) => demoDay(date, all.length - 1 - i));
+  return { daily, runs: demoRuns(new Date(), seeded(20261009)) };
+}
+
 /* ---------- Insights ---------- */
 
 export const INSIGHT_DAYS = 90;

@@ -41,6 +41,10 @@ Then redeploy, open the site, enter the password, and sign in to Garmin.
 
 Locally, neither is required: with no database configured, data is kept in `.stride/kv.json` (git-ignored), and with no password set in development the site stays open.
 
+## Export
+
+The account menu has **Export runs (CSV)** and **Export daily readings (CSV)**: everything stored, about 400 days once synced, newest first. Metric units are named in the headers, and each run links to Garmin Connect. Durations, paces and race predictions are written as `h:mm:ss`, so spreadsheets don't read 21:45 as a time of day. On the demo dashboard the same items export the demo data.
+
 ## Install on your phone
 
 Stride installs as an app: open it in Safari (iPhone: Share → Add to Home Screen) or Chrome (Android: menu → Install app). It opens full-screen with its own icon, and the status bar follows the light or dark theme.
@@ -79,6 +83,8 @@ lib/garmin/auth.ts         Garmin SSO sign-in (incl. MFA), token storage
 lib/garmin/live.ts         Garmin Connect fetcher (today)
 lib/garmin/history.ts      Garmin Connect history for the trend charts
 lib/garmin/store.ts        Stored daily history: sync, backfill, store + live reads
+lib/export.ts              CSV for runs and daily readings
+app/api/export/[kind]      CSV downloads (account menu)
 app/api/sync/route.ts      Daily cron sync (CRON_SECRET)
 app/manifest.ts            Web app manifest (icons from app/pwa/[file], app/apple-icon.tsx)
 components/pwa.tsx         Service worker registration, theme colour

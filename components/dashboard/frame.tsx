@@ -5,9 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useOffline } from "next/offline";
 import { useDeferredValue, useState, useSyncExternalStore, useTransition, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { HeartCheckIcon, Link01Icon, Logout03Icon, RunningShoesIcon, Sun03Icon, Target01Icon } from "@hugeicons/core-free-icons";
+import { Csv01Icon, HeartCheckIcon, Link01Icon, Logout03Icon, RunningShoesIcon, Sun03Icon, Target01Icon } from "@hugeicons/core-free-icons";
 import { signOutAction, syncAction } from "@/app/actions";
 import type { Range } from "@/lib/garmin/types";
+import { EXPORTS, type ExportKind } from "@/lib/export";
 import { TrendsPending } from "../charts/pending";
 import { RangePicker } from "../charts/range-picker";
 import { DiscreteTabs, type DiscreteTab } from "../uselayouts/discrete-tabs";
@@ -73,9 +74,22 @@ function SyncButton() {
 
 function AccountMenu({ name, live }: { name: string; live: boolean }) {
   const router = useRouter();
+  // A download link, clicked: the browser saves the file and stays on the page.
+  const download = (kind: ExportKind) => () => {
+    const link = document.createElement("a");
+    link.href = `/api/export/${kind}${live ? "" : "?source=demo"}`;
+    link.download = "";
+    link.click();
+  };
+  const exports: DropdownItem[] = (Object.keys(EXPORTS) as ExportKind[]).map((kind) => ({
+    id: `export-${kind}`,
+    label: `Export ${EXPORTS[kind].toLowerCase()} (CSV)`,
+    icon: Csv01Icon,
+    onSelect: download(kind),
+  }));
   const items: DropdownItem[] = live
-    ? [{ id: "signout", label: "Sign out of Garmin", icon: Logout03Icon, onSelect: () => void signOutAction() }]
-    : [{ id: "connect", label: "Connect Garmin", icon: Link01Icon, onSelect: () => router.push("/login") }];
+    ? [...exports, { id: "signout", label: "Sign out of Garmin", icon: Logout03Icon, onSelect: () => void signOutAction() }]
+    : [...exports, { id: "connect", label: "Connect Garmin", icon: Link01Icon, onSelect: () => router.push("/login") }];
 
   return (
     <SmoothDropdown

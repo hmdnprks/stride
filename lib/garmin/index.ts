@@ -12,7 +12,7 @@ import type { Range } from "./types";
 export type * from "./types";
 export { getDemoDashboard } from "./demo";
 export { isConnected } from "./auth";
-export { clearHistory, syncHistory, syncHistoryIfBehind } from "./store";
+export { clearHistory, loadAllHistory, syncHistory, syncHistoryIfBehind } from "./store";
 
 export const GARMIN_CACHE_TAG = "garmin";
 
@@ -37,7 +37,7 @@ export async function getGarminTrends(range: Range) {
   return getLiveTrends(range);
 }
 
-export { getDemoActivity, getDemoExtras, getDemoInsightsData } from "./demo";
+export { getDemoActivity, getDemoExtras, getDemoHistory, getDemoInsightsData } from "./demo";
 
 /** All-time records, shoes and the year calendar; cleared by Sync. */
 export async function getGarminExtras() {

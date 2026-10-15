@@ -216,6 +216,13 @@ export async function loadHistory(from: string, to: string): Promise<History> {
   };
 }
 
+/** Everything stored (or, before the first sync, the last year from Garmin), for the CSV export. */
+export async function loadAllHistory() {
+  const today = isoDate(new Date());
+  const meta = await getHistoryMeta();
+  return loadHistory(meta?.from ?? addDays(today, -364), today);
+}
+
 /** Forget the stored history (on sign-out, so another account starts fresh). */
 export async function clearHistory() {
   const meta = await getHistoryMeta();
