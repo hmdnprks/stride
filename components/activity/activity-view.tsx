@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ActivityDetail, Split } from "@/lib/garmin/types";
 import { clock, hm, km, pace, paceOf, parseLocal } from "@/lib/format";
 import { ThemeToggle } from "../uselayouts/theme-toggle";
+import { ShareCard } from "../share/share-card";
 import { RouteMap } from "./route-map";
 import { SampleCharts } from "./sample-charts";
 
@@ -98,6 +99,12 @@ export function ActivityView({ detail, backHref }: { detail: ActivityDetail; bac
         <header className="flex flex-col gap-3">
           <p className="text-base text-muted-foreground">{when}</p>
           <h1 className="wide text-2xl leading-[1.05] font-bold sm:text-3xl">{run.name}</h1>
+          <ShareCard
+            src={`/api/card/run/${run.id}${backHref.startsWith("/demo") ? "?source=demo" : ""}`}
+            filename={`stride-run-${run.startLocal.slice(0, 10)}`}
+            label="Share run"
+            routeOption={detail.route.length > 1}
+          />
         </header>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-4">

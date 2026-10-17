@@ -20,7 +20,7 @@ export function addDays(date: string, n: number) {
   return isoDate(d);
 }
 
-function mondayOf(date: string) {
+export function mondayOf(date: string) {
   const d = new Date(`${date}T12:00:00`);
   return addDays(date, -((d.getDay() + 6) % 7));
 }

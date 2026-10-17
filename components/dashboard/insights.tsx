@@ -1,5 +1,8 @@
 import type { recoveryCheck, sleepPerformance, weeklySummary } from "@/lib/insights";
+import type { DataSource } from "@/lib/garmin/types";
+import { isoDate, mondayOf } from "@/lib/trends";
 import { SleepRunChart } from "../charts/sleep-run-chart";
+import { ShareCard } from "../share/share-card";
 
 type Recovery = ReturnType<typeof recoveryCheck>;
 type Weekly = ReturnType<typeof weeklySummary>;
@@ -79,8 +82,9 @@ function Delta({ label, now, before, unit, digits = 0, lowerIsBetter = false }: 
   );
 }
 
-export function WeeklySummary({ week }: { week: Weekly }) {
+export function WeeklySummary({ week, source }: { week: Weekly; source: DataSource }) {
   const { current: c, previous: p } = week;
+  const monday = mondayOf(isoDate(new Date()));
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -98,6 +102,11 @@ export function WeeklySummary({ week }: { week: Weekly }) {
           <li key={s}>{s}</li>
         ))}
       </ul>
+      <ShareCard
+        src={`/api/card/week/${monday}${source === "demo" ? "?source=demo" : ""}`}
+        filename={`stride-week-${monday}`}
+        label="Share this week"
+      />
     </section>
   );
 }

@@ -88,3 +88,12 @@ export async function getGarminReview(year: number) {
     warnings: [...history.warnings, ...extras.warnings],
   };
 }
+
+/** Runs between two dates (inclusive), for the week share card; cleared by Sync. */
+export async function getGarminRunsBetween(from: string, to: string) {
+  "use cache";
+  cacheTag(GARMIN_CACHE_TAG);
+  cacheLife({ stale: 300, revalidate: 900, expire: 3600 });
+  const history = await loadHistory(from, to);
+  return history.runs.filter((r) => r.startLocal.slice(0, 10) >= from && r.startLocal.slice(0, 10) <= to);
+}

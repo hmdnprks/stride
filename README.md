@@ -46,6 +46,12 @@ Locally, neither is required: with no database configured, data is kept in `.str
 
 `/review/2026` (also in the account menu, and under the training calendar) reads a year like a race result. The year's distance sits on the watch-face panel next to a track drawn as far as the year has gone. Below it: each month as a split, the longest and fastest runs, the biggest week, how many weeks had a run, the records set that year that still stand, and how VO2 max, resting heart rate, HRV and sleep score moved from the first month to the latest. Years before Stride's stored history begins aren't available; a year that starts partway through says from when it counts.
 
+## Share cards
+
+**Share run** on a run's page and **Share this week** under the weekly summary make an image in the watch-face style: the distance huge and condensed, then time, pace, heart rate and climb (or, for a week, a bar for each day). Pick **Story** (1080×1920) or **Square** (1080×1080), then **Share** opens the phone's share sheet, or **Download** saves the PNG. A run's story card can draw the route shape; that's off by default, since a route often starts at home.
+
+Images come from `/api/card/run/{id}` and `/api/card/week/{date}`, rendered with `ImageResponse`. It can't use variable fonts, so fixed Archivo instances live in `assets/fonts` (SIL Open Font License).
+
 ## Export
 
 The account menu has **Export runs (CSV)** and **Export daily readings (CSV)**: everything stored, about 400 days once synced, newest first. Metric units are named in the headers, and each run links to Garmin Connect. Durations, paces and race predictions are written as `h:mm:ss`, so spreadsheets don't read 21:45 as a time of day. On the demo dashboard the same items export the demo data.
@@ -90,6 +96,9 @@ lib/garmin/history.ts      Garmin Connect history for the trend charts
 lib/garmin/store.ts        Stored daily history: sync, backfill, store + live reads
 lib/export.ts              CSV for runs and daily readings
 lib/review.ts              Year in review: monthly splits, highlights, body changes
+lib/card.tsx               Share card layouts (run, week; story, square)
+app/api/card/[kind]/[id]   Share card images
+components/share/          Share panel: preview, size, route, share or download
 app/review/[year]          Year in review page (demo: app/demo/review/[year])
 app/api/export/[kind]      CSV downloads (account menu)
 app/api/sync/route.ts      Daily cron sync (CRON_SECRET)

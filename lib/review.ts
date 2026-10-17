@@ -1,5 +1,5 @@
 import type { DailyRaw, PersonalRecord, Run } from "./garmin/types";
-import { addDays, eachDay, isoDate } from "./trends";
+import { eachDay, isoDate, mondayOf } from "./trends";
 
 // A year of running, read like a race result: months are the splits, then
 // the standout runs, the records set, and how the body changed.
@@ -50,11 +50,6 @@ export interface YearReview {
 
 const dateOf = (r: Run) => r.startLocal.slice(0, 10);
 const round = (x: number, digits = 0) => Math.round(x * 10 ** digits) / 10 ** digits;
-
-function mondayOf(date: string) {
-  const d = new Date(`${date}T12:00:00`);
-  return addDays(date, -((d.getDay() + 6) % 7));
-}
 
 const mean = (xs: (number | null)[]) => {
   const v = xs.filter((x): x is number => x !== null);

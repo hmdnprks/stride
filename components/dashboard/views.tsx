@@ -200,7 +200,7 @@ export function TodayView({
       </div>
 
       {recovery.level === "ok" && <RecoveryCheck check={recovery} />}
-      <WeeklySummary week={week} />
+      <WeeklySummary week={week} source={data.source} />
 
       <RecoveryTrends trends={trends} />
     </div>
