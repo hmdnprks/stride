@@ -76,6 +76,7 @@ Watch-face direction: the Today view is a scaled-up four-field data screen, like
 - **Weight encodes value:** Body battery and sleep score get heavier as they rise (`components/stat-number.tsx`).
 - **Colour:** black, white, track blue `#1F47F5`, pale lane blue. Dark mode uses deep navy. Tokens live in `app/globals.css` under shadcn names.
 - **Charts:** hand-built SVG in `components/charts/`, following the dataviz skill: one axis per chart, a hover and arrow-key tooltip, a table view under every chart, colours checked with its palette validator (sleep stages use a validated ordinal blue ramp).
+- **Route:** each run's route is a solid wall on the blue panel, like a circuit model (three.js, loaded only on the run page). Its top follows elevation, exaggerated 10× and capped so hilly runs stay readable; with no elevation it's level. A navy block marks the start; drag or use the arrow keys to turn it. No basemap, so GPS tracks stay off tile servers.
 - **Mark:** a running track whose outer lane is drawn like a lap in progress, white on track blue (`lib/brand.ts`, copied into `app/icon.svg` and `public/offline.html`).
 - **Components:** from [uselayouts](https://uselayouts.com), installed via the shadcn registry (`@uselayouts/...`, see `components.json`) and adapted in `components/uselayouts/`: discrete tabs (view switcher), save button (Sync and Sign in states), smooth dropdown (account menu), theme toggle. Numbers animate with NumberFlow.
 
@@ -89,7 +90,8 @@ app/runs/[id]/page.tsx     One run in detail (demo: app/demo/runs/[id])
 app/actions.ts             Sign-in, verification code, sync and sign-out server actions
 components/dashboard/      Frame (header, tabs, range picker), views, trends, insights, goals
 components/charts/         TrendChart, PaceHrChart, CalendarHeatmap, Sparkline, RangePicker
-components/activity/       Run detail: route shape, per-sample charts, splits
+components/activity/       Run detail: 3D route model, per-sample charts, splits
+lib/route-3d.ts            Route → solid wall model (resampling, elevation by distance)
 components/watch-face.tsx  The four-field data screen
 components/stat-number.tsx Weight-encoded animated figures
 components/uselayouts/     Adapted uselayouts components
