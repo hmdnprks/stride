@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Dashboard, Run, RunningExtras, Sleep, Trends } from "@/lib/garmin";
-import type { recoveryCheck, sleepPerformance, weeklySummary } from "@/lib/insights";
+import type { heatPerformance, recoveryCheck, sleepPerformance, weeklySummary } from "@/lib/insights";
 import { clock, hm, km, pace, paceOf, runningTotals, shortDate } from "@/lib/format";
 import { CalendarHeatmap } from "../charts/calendar-heatmap";
 import { Sparkline } from "../charts/sparkline";
 import { WatchFace } from "../watch-face";
-import { RecoveryCheck, SleepPerformance, WeeklySummary } from "./insights";
+import { HeatPerformance, RecoveryCheck, SleepPerformance, WeeklySummary } from "./insights";
 import { PersonalRecords, ShoeMileage } from "./records";
 import { FitnessTrends, RecoveryTrends, RunningTrends } from "./trends";
 
@@ -213,10 +213,12 @@ export function FitnessView({
   data,
   trends,
   sleepPerf,
+  heatPerf,
 }: {
   data: Dashboard;
   trends: Trends;
   sleepPerf: ReturnType<typeof sleepPerformance>;
+  heatPerf: ReturnType<typeof heatPerformance>;
 }) {
   const { vo2Max, fitnessAge, trainingStatus, racePredictions: rp } = data;
   const races = rp
@@ -306,6 +308,7 @@ export function FitnessView({
       </section>
 
       <SleepPerformance result={sleepPerf} />
+      <HeatPerformance result={heatPerf} />
 
       <FitnessTrends trends={trends} />
     </div>

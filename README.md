@@ -46,6 +46,10 @@ Locally, neither is required: with no database configured, data is kept in `.str
 
 `/review/2026` (also in the account menu, and under the training calendar) reads a year like a race result. The year's distance sits on the watch-face panel next to a track drawn as far as the year has gone. Below it: each month as a split, the longest and fastest runs, the biggest week, how many weeks had a run, the records set that year that still stand, and how VO2 max, resting heart rate, HRV and sleep score moved from the first month to the latest. Years before Stride's stored history begins aren't available; a year that starts partway through says from when it counts.
 
+## Weather
+
+Each run's start conditions (temperature, feels-like, dew point, humidity, wind) come from Garmin's record of the nearest weather station, so no location goes to a third-party service. They're fetched once per run during a sync and stored with the run; a page load fills in any that are missing. The run page shows them, the runs CSV includes them, and **Does heat slow you down?** on the Fitness tab plots easy-run efficiency (metres per heartbeat) against dew point over the last 16 weeks.
+
 ## Share cards
 
 **Share run** on a run's page and **Share this week** under the weekly summary make an image in the watch-face style: the distance huge and condensed, then time, pace, heart rate and climb (or, for a week, a bar for each day). Pick **Story** (1080×1920) or **Square** (1080×1080), then **Share** opens the phone's share sheet, or **Download** saves the PNG. A run's story card can draw the route shape; that's off by default, since a route often starts at home.
@@ -108,6 +112,7 @@ public/sw.js               Service worker: offline page only
 lib/garmin/extras.ts       Personal records, shoes, the year calendar
 lib/garmin/activity.ts     One activity: streams, GPS route, laps
 lib/garmin/map.ts          Connect activity → Run mapping
+lib/garmin/weather.ts      Per-run weather from Garmin (°F/mph → metric)
 lib/trends.ts              Date ranges, weekly bucketing, training load
 lib/insights.ts            Weekly summary, sleep vs performance, recovery check, goals, race plan
 lib/settings.ts            Goals and race, stored in .stride/settings.json

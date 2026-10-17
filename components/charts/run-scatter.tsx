@@ -1,45 +1,84 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import useMeasure from "react-use-measure";
-import type { SleepRunPoint } from "@/lib/insights";
+import type { HeatRunPoint, SleepRunPoint } from "@/lib/insights";
 import { linear, niceTicks, shortDay } from "./scale";
 
 const M = { top: 12, right: 12, bottom: 34, left: 44 };
 const HIT_RADIUS = 24;
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
 
-function fit(points: SleepRunPoint[]) {
-  if (points.length < 3) return null;
-  const n = points.length;
-  const mx = points.reduce((a, p) => a + p.sleepScore, 0) / n;
-  const my = points.reduce((a, p) => a + p.metresPerBeat, 0) / n;
-  const sxx = points.reduce((a, p) => a + (p.sleepScore - mx) ** 2, 0);
+interface EasyRunPoint {
+  id: string;
+  date: string;
+  name: string;
+  metresPerBeat: number;
+  paceSecPerKm: number;
+  avgHr: number;
+}
+
+function fit(xsOf: number[], ysOf: number[]) {
+  if (xsOf.length < 3) return null;
+  const n = xsOf.length;
+  const mx = xsOf.reduce((a, v) => a + v, 0) / n;
+  const my = ysOf.reduce((a, v) => a + v, 0) / n;
+  const sxx = xsOf.reduce((a, v) => a + (v - mx) ** 2, 0);
   if (!sxx) return null;
-  const slope = points.reduce((a, p) => a + (p.sleepScore - mx) * (p.metresPerBeat - my), 0) / sxx;
+  const slope = xsOf.reduce((a, v, i) => a + (v - mx) * (ysOf[i] - my), 0) / sxx;
   return (x: number) => my + slope * (x - mx);
 }
 
-/** Each easy run: last night's sleep score across, running efficiency up. */
-export function SleepRunChart({ points, height = 220 }: { points: SleepRunPoint[]; height?: number }) {
+/**
+ * Each easy run as a dot: some condition across (sleep, dew point), running
+ * efficiency up, with a trend line, a tooltip, arrow-key stepping and a table.
+ */
+function EasyRunScatter<P extends EasyRunPoint>({
+  points,
+  xOf,
+  xLabel,
+  xColumn,
+  xFormat = String,
+  xPad,
+  ariaLabel,
+  empty,
+  describe,
+  height = 220,
+}: {
+  points: P[];
+  xOf: (p: P) => number;
+  /** Axis title, e.g. "Sleep score the night before". */
+  xLabel: string;
+  /** Table column heading for x. */
+  xColumn: string;
+  xFormat?: (v: number) => string;
+  /** Room either side of the data on the x axis. */
+  xPad: number;
+  ariaLabel: string;
+  empty: string;
+  /** Tooltip line under the efficiency figure. */
+  describe: (p: P) => ReactNode;
+  height?: number;
+}) {
   const [ref, { width }] = useMeasure();
   const [hover, setHover] = useState<number | null>(null);
 
   if (!points.length) {
-    return <p className="rounded-2xl bg-muted p-6 text-sm text-muted-foreground">No easy runs with sleep data yet.</p>;
+    return <p className="rounded-2xl bg-muted p-6 text-sm text-muted-foreground">{empty}</p>;
   }
 
-  const xs = niceTicks(Math.min(...points.map((p) => p.sleepScore)) - 3, Math.max(...points.map((p) => p.sleepScore)) + 3, 5);
+  const xVals = points.map(xOf);
+  const xs = niceTicks(Math.min(...xVals) - xPad, Math.max(...xVals) + xPad, 5);
   const ys = niceTicks(Math.min(...points.map((p) => p.metresPerBeat)) * 0.97, Math.max(...points.map((p) => p.metresPerBeat)) * 1.03, 4);
   const x = linear(xs.min, xs.max, M.left, width - M.right);
   const y = linear(ys.min, ys.max, M.top + height, M.top);
-  const trend = fit(points);
+  const trend = fit(xVals, points.map((p) => p.metresPerBeat));
 
   const nearest = (px: number, py: number) => {
     let best: number | null = null;
     let bestD = HIT_RADIUS ** 2;
     points.forEach((p, i) => {
-      const d = (x(p.sleepScore) - px) ** 2 + (y(p.metresPerBeat) - py) ** 2;
+      const d = (x(xOf(p)) - px) ** 2 + (y(p.metresPerBeat) - py) ** 2;
       if (d <= bestD) {
         bestD = d;
         best = i;
@@ -71,7 +110,7 @@ export function SleepRunChart({ points, height = 220 }: { points: SleepRunPoint[
               width={width}
               height={height + M.top + M.bottom}
               role="img"
-              aria-label="Easy-run efficiency against the previous night's sleep score. Use the arrow keys to step through runs."
+              aria-label={`${ariaLabel} Use the arrow keys to step through runs.`}
               tabIndex={0}
               className="touch-pan-y overflow-visible outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
               onPointerMove={(e) => {
@@ -99,11 +138,11 @@ export function SleepRunChart({ points, height = 220 }: { points: SleepRunPoint[
               ))}
               {xs.ticks.map((t) => (
                 <text key={`x${t}`} x={x(t)} y={M.top + height + 18} textAnchor="middle" className="fill-muted-foreground text-[11px] tabular-nums">
-                  {t}
+                  {xFormat(t)}
                 </text>
               ))}
               <text x={width - M.right} y={M.top + height + 32} textAnchor="end" className="fill-muted-foreground text-[11px]">
-                Sleep score the night before
+                {xLabel}
               </text>
               {trend && (
                 <line
@@ -119,7 +158,7 @@ export function SleepRunChart({ points, height = 220 }: { points: SleepRunPoint[
               {points.map((p, i) => (
                 <circle
                   key={p.id}
-                  cx={x(p.sleepScore)}
+                  cx={x(xOf(p))}
                   cy={y(p.metresPerBeat)}
                   r={hover === i ? 6 : 4}
                   fill="var(--series)"
@@ -134,7 +173,7 @@ export function SleepRunChart({ points, height = 220 }: { points: SleepRunPoint[
                 className="pointer-events-none absolute z-10 min-w-44 rounded-xl border border-border bg-popover px-3 py-2 text-xs shadow-[0_8px_24px_-12px_rgb(10_27_92/0.4)]"
                 style={{
                   top: Math.max(0, y(h.metresPerBeat) - 78),
-                  ...(x(h.sleepScore) > width / 2 ? { right: width - x(h.sleepScore) + 14 } : { left: x(h.sleepScore) + 14 }),
+                  ...(x(xOf(h)) > width / 2 ? { right: width - x(xOf(h)) + 14 } : { left: x(xOf(h)) + 14 }),
                 }}
               >
                 <p className="mb-1 text-muted-foreground">
@@ -144,9 +183,7 @@ export function SleepRunChart({ points, height = 220 }: { points: SleepRunPoint[
                   <span className="font-semibold tabular-nums">{h.metresPerBeat.toFixed(2)} m</span>{" "}
                   <span className="text-muted-foreground">per heartbeat</span>
                 </p>
-                <p className="tabular-nums text-muted-foreground">
-                  Slept {h.sleepScore}, ran {clock(h.paceSecPerKm)} /km at {h.avgHr} bpm
-                </p>
+                <p className="tabular-nums text-muted-foreground">{describe(h)}</p>
               </div>
             )}
           </>
@@ -163,7 +200,7 @@ export function SleepRunChart({ points, height = 220 }: { points: SleepRunPoint[
             <thead className="sticky top-0 bg-muted text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 text-right font-medium">Sleep score</th>
+                <th className="px-3 py-2 text-right font-medium">{xColumn}</th>
                 <th className="px-3 py-2 text-right font-medium">m per beat</th>
                 <th className="px-3 py-2 text-right font-medium">Pace /km</th>
                 <th className="px-3 py-2 text-right font-medium">Heart rate</th>
@@ -173,7 +210,7 @@ export function SleepRunChart({ points, height = 220 }: { points: SleepRunPoint[
               {[...points].reverse().map((p) => (
                 <tr key={p.id} className="border-t border-border">
                   <td className="px-3 py-1.5 text-muted-foreground">{shortDay(p.date)}</td>
-                  <td className="px-3 py-1.5 text-right">{p.sleepScore}</td>
+                  <td className="px-3 py-1.5 text-right">{xFormat(xOf(p))}</td>
                   <td className="px-3 py-1.5 text-right">{p.metresPerBeat.toFixed(2)}</td>
                   <td className="px-3 py-1.5 text-right">{clock(p.paceSecPerKm)}</td>
                   <td className="px-3 py-1.5 text-right">{p.avgHr} bpm</td>
@@ -184,5 +221,38 @@ export function SleepRunChart({ points, height = 220 }: { points: SleepRunPoint[
         </div>
       </details>
     </figure>
+  );
+}
+
+/** Each easy run: last night's sleep score across, running efficiency up. */
+export function SleepRunChart({ points }: { points: SleepRunPoint[] }) {
+  return (
+    <EasyRunScatter
+      points={points}
+      xOf={(p) => p.sleepScore}
+      xLabel="Sleep score the night before"
+      xColumn="Sleep score"
+      xPad={3}
+      ariaLabel="Easy-run efficiency against the previous night's sleep score."
+      empty="No easy runs with sleep data yet."
+      describe={(p) => `Slept ${p.sleepScore}, ran ${clock(p.paceSecPerKm)} /km at ${p.avgHr} bpm`}
+    />
+  );
+}
+
+/** Each easy run: dew point at the start across, running efficiency up. */
+export function HeatRunChart({ points }: { points: HeatRunPoint[] }) {
+  return (
+    <EasyRunScatter
+      points={points}
+      xOf={(p) => p.dewPointC}
+      xLabel="Dew point at the start (°C)"
+      xColumn="Dew point"
+      xFormat={(v) => `${Math.round(v)}°`}
+      xPad={1}
+      ariaLabel="Easy-run efficiency against the dew point at the start."
+      empty="No easy runs with weather yet. Weather fills in as Stride syncs."
+      describe={(p) => `${Math.round(p.tempC)}°C, dew point ${Math.round(p.dewPointC)}°C; ran ${clock(p.paceSecPerKm)} /km at ${p.avgHr} bpm`}
+    />
   );
 }

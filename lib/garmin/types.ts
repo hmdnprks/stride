@@ -52,6 +52,19 @@ export interface RacePredictions {
   marathon: number | null;
 }
 
+/** Conditions at the start of a run, from the nearest weather station Garmin uses. */
+export interface RunWeather {
+  tempC: number;
+  feelsLikeC: number | null;
+  dewPointC: number | null;
+  humidityPct: number | null;
+  windKph: number | null;
+  /** e.g. "Mostly Clear" */
+  desc: string | null;
+  /** e.g. "Jakarta / Soekarno-Hatta" */
+  station: string | null;
+}
+
 export interface Run {
   id: string;
   name: string;
@@ -72,6 +85,8 @@ export interface Run {
   strideCm: number | null;
   groundContactMs: number | null;
   verticalRatioPct: number | null;
+  /** Start conditions; null when Garmin has none (treadmill), absent until fetched. */
+  weather?: RunWeather | null;
 }
 
 export interface Dashboard {

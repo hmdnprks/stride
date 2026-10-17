@@ -57,6 +57,10 @@ export function runsCsv(runs: Run[], { garmin }: { garmin: boolean }) {
     "Stride length (cm)",
     "Ground contact (ms)",
     "Vertical ratio (%)",
+    "Temperature (°C)",
+    "Feels like (°C)",
+    "Dew point (°C)",
+    "Humidity (%)",
     "Garmin Connect link",
   ];
   const rows = [...runs]
@@ -77,6 +81,10 @@ export function runsCsv(runs: Run[], { garmin }: { garmin: boolean }) {
       fixed(r.strideCm, 0),
       fixed(r.groundContactMs, 0),
       fixed(r.verticalRatioPct, 1),
+      r.weather?.tempC ?? null,
+      r.weather?.feelsLikeC ?? null,
+      r.weather?.dewPointC ?? null,
+      r.weather?.humidityPct ?? null,
       garmin ? `https://connect.garmin.com/modern/activity/${r.id}` : null,
     ]);
   return csv(header, rows);

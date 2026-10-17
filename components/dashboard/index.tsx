@@ -1,5 +1,5 @@
 import type { Dashboard as Data, InsightsData, RunningExtras, StrideSettings, Trends } from "@/lib/garmin";
-import { goalProgress, racePlan, recoveryCheck, sleepPerformance, weeklySummary } from "@/lib/insights";
+import { goalProgress, racePlan, recoveryCheck, heatPerformance, HEAT_WEEKS, sleepPerformance, weeklySummary } from "@/lib/insights";
 import { addDays, isoDate } from "@/lib/trends";
 import { DistanceGoals, RaceCountdown } from "./goals";
 import { DashboardFrame } from "./frame";
@@ -23,6 +23,8 @@ export function Dashboard({
   const week = weeklySummary(daily, runs, today);
   const recovery = recoveryCheck(daily, runs, data.bodyBattery?.current ?? null, today);
   const sleepPerf = sleepPerformance(daily, runs.filter((r) => r.startLocal.slice(0, 10) >= addDays(today, -89)), extras.hrZones);
+  // Insight data carries runs from 4 weeks before its 90 days, so 16 weeks of runs fit.
+  const heatPerf = heatPerformance(runs.filter((r) => r.startLocal.slice(0, 10) >= addDays(today, -(HEAT_WEEKS * 7 - 1))), extras.hrZones);
   const goals = goalProgress(extras.calendar, settings, today);
   const last28Km = runs.filter((r) => r.startLocal.slice(0, 10) > addDays(today, -28)).reduce((a, r) => a + r.distanceM, 0) / 1000;
   const plan = settings.race ? racePlan(settings.race, last28Km / 4, data.racePredictions, today) : null;
@@ -34,7 +36,7 @@ export function Dashboard({
       range={trends.range}
       views={{
         today: <TodayView data={data} trends={trends} recovery={recovery} week={week} />,
-        fitness: <FitnessView data={data} trends={trends} sleepPerf={sleepPerf} />,
+        fitness: <FitnessView data={data} trends={trends} sleepPerf={sleepPerf} heatPerf={heatPerf} />,
         runs: <RunsView data={data} trends={trends} extras={extras} />,
         goals: (
           <div className="flex flex-col gap-16">

@@ -2,6 +2,7 @@ import "server-only";
 
 import { savedClient } from "./auth";
 import { withLoad } from "./map";
+import { mapWeather } from "./weather";
 import type { ActivityDetail, ActivitySample, Run, Split } from "./types";
 
 // One run in full: summary, per-sample streams, GPS polyline and laps.
@@ -25,6 +26,7 @@ export async function getLiveActivity(id: string): Promise<ActivityDetail | null
 
   // Zone times aren't in the summary; fetched alongside it for the load estimate.
   const zonesReq: Promise<Json[] | null> = get(`/activity-service/activity/${id}/hrTimeInZones`).catch(() => null);
+  const weatherReq = get(`/activity-service/activity/${id}/weather`).then(mapWeather, () => undefined);
 
   let summary: Json;
   try {
@@ -35,7 +37,7 @@ export async function getLiveActivity(id: string): Promise<ActivityDetail | null
   if (!summary?.summaryDTO) return null;
   const s = summary.summaryDTO;
 
-  const zones = await zonesReq;
+  const [zones, weather] = await Promise.all([zonesReq, weatherReq]);
   const zoneSecs = [1, 2, 3, 4, 5].map((z) => num(zones?.find((x: Json) => x?.zoneNumber === z)?.secsInZone));
 
   const run: Run = withLoad({
@@ -52,6 +54,7 @@ export async function getLiveActivity(id: string): Promise<ActivityDetail | null
     strideCm: num(s.strideLength),
     groundContactMs: num(s.groundContactTime),
     verticalRatioPct: num(s.verticalRatio),
+    weather,
   });
 
   const [details, laps] = await Promise.all([

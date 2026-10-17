@@ -1,4 +1,4 @@
-import type { ActivityDetail, ActivitySample, DailyRaw, Dashboard, InsightsData, Range, Run, RunningExtras, Split, Trends } from "./types";
+import type { ActivityDetail, ActivitySample, DailyRaw, Dashboard, InsightsData, Range, Run, RunningExtras, RunWeather, Split, Trends } from "./types";
 import { addDays, buildCalendar, buildTrends, eachDay, isoDate, rangeWindow } from "../trends";
 import { buildReview, reviewYears } from "../review";
 
@@ -45,6 +45,28 @@ function demoDynamics(pace: number, durationSec: number, zones: number[]) {
   };
 }
 
+/**
+ * Early-morning weather for a demo run: a temperate year, warmest in July,
+ * with day-to-day noise. Derived from the date alone, so it doesn't disturb
+ * the seeded sequence the rest of the demo uses.
+ */
+function demoWeather(day: Date): RunWeather {
+  const start = new Date(day.getFullYear(), 0, 1).getTime();
+  const doy = (day.getTime() - start) / 86_400_000;
+  const noise = (k: number) => (Math.sin(doy * 12.9898 + k * 78.233) * 43758.5453) % 1;
+  const tempC = Math.round((13 - 9 * Math.cos(((doy - 15) / 365) * 2 * Math.PI) + noise(1) * 4) * 10) / 10;
+  const dewPointC = Math.round((tempC - 3 - Math.abs(noise(2)) * 8) * 10) / 10;
+  return {
+    tempC,
+    feelsLikeC: tempC,
+    dewPointC,
+    humidityPct: Math.round(100 * Math.exp((17.6 * dewPointC) / (243 + dewPointC) - (17.6 * tempC) / (243 + tempC))),
+    windKph: Math.round(6 + Math.abs(noise(3)) * 18),
+    desc: noise(4) > 0.3 ? "Partly Cloudy" : "Clear",
+    station: "Demo City Airport",
+  };
+}
+
 function demoRuns(today: Date, rand: () => number): Run[] {
   const runs: Run[] = [];
   // A year plus load warm-up. Fitness improves towards today: older runs are
@@ -64,16 +86,19 @@ function demoRuns(today: Date, rand: () => number): Run[] {
     const pace = lerp(t.pace) * fitness * (1 + (78 - sleep) / 800);
     day.setHours(5, 30 + Math.floor(rand() * 40), 0, 0);
 
+    const weather = demoWeather(day);
     runs.push({
       id: `demo-${back}`,
       name: t.name,
       startLocal: localStamp(day),
       distanceM,
       durationSec: Math.round((distanceM / 1000) * pace),
-      avgHr: Math.round(lerp(t.hr) + (back / 365) * 4),
+      // Muggy mornings cost a few beats at the same pace.
+      avgHr: Math.round(lerp(t.hr) + (back / 365) * 4 + Math.max(0, weather.dewPointC! - 10) * 0.8),
       elevationGainM: Math.round(lerp([20, 140])),
       load: Math.round(((distanceM / 1000) * pace * t.intensity) / 60),
       loadEstimated: false,
+      weather,
       ...demoDynamics(pace, Math.round((distanceM / 1000) * pace), t.zones),
     });
   }

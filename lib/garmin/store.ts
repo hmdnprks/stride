@@ -1,8 +1,10 @@
 import "server-only";
 
 import { kvClaim, kvDel, kvGet, kvGetMany, kvSetMany, kvSet } from "../kv";
-import { emptyDay, fetchHistory, type History } from "./history";
+import { savedClient } from "./auth";
+import { emptyDay, fetchHistory, pool, type History } from "./history";
 import { withLoad } from "./map";
+import { mapWeather } from "./weather";
 import type { DailyRaw, Run } from "./types";
 import { addDays, eachDay, isoDate, LOAD_WARMUP_DAYS } from "../trends";
 
@@ -29,6 +31,8 @@ const LIVE_DAYS = 3;
 const MAX_ATTEMPTS = 3;
 /** Don't retry a failed sync from page loads more often than this. */
 const RETRY_AFTER_MS = 60 * 60 * 1000;
+/** Weather is fetched once per run and kept; this many runs per sync at most. */
+const WEATHER_PER_SYNC = 250;
 /** Long enough for a full backfill; released early when the sync ends. */
 const LOCK_SECONDS = 300;
 
@@ -45,6 +49,10 @@ export interface HistoryMeta {
   syncedAt: string;
   attempts: number;
   lastError: string | null;
+  /** Every stored run has its weather (or is known to have none). */
+  weatherComplete?: boolean;
+  /** When a weather-only catch-up last ran (ISO), so failures retry hourly at most. */
+  weatherTriedAt?: string;
 }
 
 const runDate = (r: Run) => r.startLocal.slice(0, 10);
@@ -103,6 +111,9 @@ async function writeHistory(h: History, from: string, through: string, runsOk: b
     else month.days.push(day);
   }
 
+  // Re-fetched runs come without weather; keep what's stored rather than fetch it again.
+  const storedWeather = new Map([...months.values()].flatMap((m) => m.runs.map((r) => [r.id, r.weather] as const)));
+
   if (runsOk) {
     for (const month of months.values()) {
       month.runs = month.runs.filter((r) => runDate(r) < runsFrom || runDate(r) > through);
@@ -112,7 +123,8 @@ async function writeHistory(h: History, from: string, through: string, runsOk: b
     const date = runDate(run);
     if (date < runsFrom || date > through) continue;
     const month = months.get(date.slice(0, 7))!;
-    month.runs = [...month.runs.filter((r) => r.id !== run.id), run];
+    const weather = run.weather ?? storedWeather.get(run.id);
+    month.runs = [...month.runs.filter((r) => r.id !== run.id), weather === undefined ? run : { ...run, weather }];
   }
 
   for (const month of months.values()) {
@@ -120,6 +132,35 @@ async function writeHistory(h: History, from: string, through: string, runsOk: b
     month.runs.sort((a, b) => a.startLocal.localeCompare(b.startLocal));
   }
   await kvSetMany([...months].map(([m, data]) => [monthKey(m), data]));
+}
+
+/**
+ * Fetch weather for stored runs that don't have it yet, newest first. A run
+ * Garmin has no weather for (treadmill) is stored as null so it isn't asked
+ * again; a failed request leaves it for the next sync.
+ */
+async function fillWeather(from: string, through: string) {
+  const months = await readMonths(addDays(from, -LOAD_WARMUP_DAYS), through);
+  const missing = [...months.values()]
+    .flatMap((m) => m.runs)
+    .filter((r) => r.weather === undefined)
+    .sort((a, b) => b.startLocal.localeCompare(a.startLocal))
+    .slice(0, WEATHER_PER_SYNC);
+  if (!missing.length) return { failed: 0, complete: true };
+
+  const { gc, save } = await savedClient();
+  let failed = 0;
+  await pool(missing, async (run) => {
+    try {
+      run.weather = mapWeather(await gc.get(`https://connectapi.garmin.com/activity-service/activity/${run.id}/weather`));
+    } catch {
+      failed++;
+    }
+  });
+  await save();
+  await kvSetMany([...months].map(([m, data]) => [monthKey(m), data]));
+  const left = [...months.values()].flatMap((m) => m.runs).filter((r) => r.weather === undefined).length;
+  return { failed, complete: left === 0 };
 }
 
 export type SyncResult =
@@ -146,6 +187,8 @@ export async function syncHistory(): Promise<SyncResult> {
     const h = await fetchHistory(from, yesterday);
     const runsOk = !h.warnings.some((w) => w.startsWith("Runs"));
     await writeHistory(h, from, yesterday, runsOk);
+    const weather = await fillWeather(backfilled ? meta!.from! : from, yesterday);
+    if (weather.failed) console.warn(`Stride history sync: weather failed for ${weather.failed} runs; retrying next sync.`);
 
     const attempts = (meta?.attempts ?? 0) + 1;
     const now = new Date().toISOString();
@@ -161,8 +204,24 @@ export async function syncHistory(): Promise<SyncResult> {
       syncedAt: now,
       attempts: 0,
       lastError: h.warnings.length ? h.warnings.join("; ") : null,
+      weatherComplete: weather.complete,
     } satisfies HistoryMeta);
     return { status: "synced", from: covered, through: yesterday, warnings: h.warnings };
+  } finally {
+    await kvDel(LOCK_KEY);
+  }
+}
+
+/**
+ * Weather only, for a store that's current but has runs without weather
+ * (stored before weather existed, or a request failed).
+ */
+async function catchUpWeather(meta: HistoryMeta) {
+  if (!meta.from || !meta.through || !(await kvClaim(LOCK_KEY, LOCK_SECONDS))) return;
+  try {
+    const weather = await fillWeather(meta.from, meta.through);
+    const latest = await getHistoryMeta();
+    if (latest) await kvSet(META_KEY, { ...latest, weatherComplete: weather.complete, weatherTriedAt: new Date().toISOString() } satisfies HistoryMeta);
   } finally {
     await kvDel(LOCK_KEY);
   }
@@ -172,7 +231,13 @@ export async function syncHistory(): Promise<SyncResult> {
 export async function syncHistoryIfBehind() {
   const meta = await getHistoryMeta();
   const yesterday = addDays(isoDate(new Date()), -1);
-  if (meta?.through && meta.through >= yesterday) return;
+  if (meta?.through && meta.through >= yesterday) {
+    const tried = meta.weatherTriedAt ? Date.parse(meta.weatherTriedAt) : 0;
+    if (!meta.weatherComplete && Date.now() - tried > RETRY_AFTER_MS) {
+      await catchUpWeather(meta).catch((err) => console.warn(`Stride weather catch-up failed: ${err instanceof Error ? err.message : err}`));
+    }
+    return;
+  }
   if (meta?.attempts && Date.now() - Date.parse(meta.syncedAt) < RETRY_AFTER_MS) return;
   try {
     await syncHistory();
@@ -196,18 +261,24 @@ export async function loadHistory(from: string, to: string): Promise<History> {
   const runsFrom = addDays(from, -LOAD_WARMUP_DAYS);
 
   const [months, live] = await Promise.all([
-    readMonths(runsFrom, max(runsFrom, storedTo)),
+    readMonths(runsFrom, max(runsFrom, min(to, meta.through))),
     liveFrom <= to ? fetchHistory(liveFrom, to) : null,
   ]);
 
   const storedDays = new Map<string, DailyRaw>();
   const runs = new Map<string, Run>();
+  const storedWeather = new Map<string, Run["weather"]>();
   for (const month of months.values()) {
+    for (const r of month.runs) storedWeather.set(r.id, r.weather);
     for (const d of month.days) storedDays.set(d.date, d);
     for (const r of month.runs) if (runDate(r) >= runsFrom && runDate(r) <= storedTo) runs.set(r.id, r);
   }
   const liveDays = new Map(live?.daily.map((d) => [d.date, d]));
-  for (const r of live?.runs ?? []) if (runDate(r) >= runsFrom && runDate(r) <= to) runs.set(r.id, r);
+  for (const r of live?.runs ?? []) {
+    if (runDate(r) < runsFrom || runDate(r) > to) continue;
+    const weather = r.weather ?? storedWeather.get(r.id);
+    runs.set(r.id, weather === undefined ? r : { ...r, weather });
+  }
 
   const daily = eachDay(from, to).map((date) => {
     const fresh = liveDays.get(date);

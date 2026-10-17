@@ -31,7 +31,7 @@ function chunks(from: string, to: string) {
   return out;
 }
 
-async function pool<T, R>(items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
+export async function pool<T, R>(items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let next = 0;
   await Promise.all(

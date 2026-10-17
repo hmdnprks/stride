@@ -1,12 +1,13 @@
-import type { recoveryCheck, sleepPerformance, weeklySummary } from "@/lib/insights";
+import { HEAT_WEEKS, type heatPerformance, type recoveryCheck, type sleepPerformance, type weeklySummary } from "@/lib/insights";
 import type { DataSource } from "@/lib/garmin/types";
 import { isoDate, mondayOf } from "@/lib/trends";
-import { SleepRunChart } from "../charts/sleep-run-chart";
+import { HeatRunChart, SleepRunChart } from "../charts/run-scatter";
 import { ShareCard } from "../share/share-card";
 
 type Recovery = ReturnType<typeof recoveryCheck>;
 type Weekly = ReturnType<typeof weeklySummary>;
 type SleepPerf = ReturnType<typeof sleepPerformance>;
+type HeatPerf = ReturnType<typeof heatPerformance>;
 
 function SignalIcon({ flagged }: { flagged: boolean }) {
   return flagged ? (
@@ -123,6 +124,23 @@ export function SleepPerformance({ result }: { result: SleepPerf }) {
         </p>
       </div>
       <SleepRunChart points={result.points} />
+    </section>
+  );
+}
+
+export function HeatPerformance({ result }: { result: HeatPerf }) {
+  return (
+    <section className="flex flex-col gap-6">
+      <div className="flex max-w-[72ch] flex-col gap-2">
+        <h2 className="wide text-lg font-semibold">Does heat slow you down?</h2>
+        <p className="text-base leading-relaxed">{result.verdict}</p>
+        <p className="text-sm text-muted-foreground">
+          Uses your easy runs from the last {HEAT_WEEKS} weeks (average heart rate up to {result.easyCap} bpm) and the weather Garmin
+          recorded at each start. Dew point measures how muggy it was: above about 20°C, sweat stops cooling you well and the same
+          pace costs more heartbeats.
+        </p>
+      </div>
+      <HeatRunChart points={result.points} />
     </section>
   );
 }

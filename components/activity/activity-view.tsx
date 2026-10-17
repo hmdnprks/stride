@@ -1,5 +1,6 @@
 import Link from "next/link";
-import type { ActivityDetail, Split } from "@/lib/garmin/types";
+import type { ActivityDetail, RunWeather, Split } from "@/lib/garmin/types";
+import { weatherLine } from "@/lib/garmin/weather";
 import { clock, hm, km, pace, paceOf, parseLocal } from "@/lib/format";
 import { ThemeToggle } from "../uselayouts/theme-toggle";
 import { ShareCard } from "../share/share-card";
@@ -15,6 +16,22 @@ function Stat({ label, value, unit }: { label: string; value: string; unit?: str
         {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
       </span>
     </div>
+  );
+}
+
+function WeatherNote({ weather: w }: { weather: RunWeather }) {
+  const parts = [
+    weatherLine(w),
+    w.dewPointC !== null && `dew point ${Math.round(w.dewPointC)}°C`,
+    w.humidityPct !== null && `humidity ${Math.round(w.humidityPct)}%`,
+    w.windKph !== null && `wind ${w.windKph} km/h`,
+    w.desc?.toLowerCase(),
+  ].filter(Boolean);
+  return (
+    <p className="-mt-6 max-w-[72ch] text-sm text-muted-foreground">
+      <span className="font-semibold text-foreground">Weather at the start:</span> {parts.join(", ")}.
+      {w.station && ` Reported by ${w.station}.`}
+    </p>
   );
 }
 
@@ -131,6 +148,7 @@ export function ActivityView({ detail, backHref }: { detail: ActivityDetail; bac
               </div>
             ))}
         </dl>
+        {run.weather && <WeatherNote weather={run.weather} />}
 
         <div className="grid gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <section className="flex flex-col gap-4">

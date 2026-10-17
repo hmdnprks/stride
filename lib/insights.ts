@@ -129,21 +129,34 @@ const POOR_SLEEP = 70;
  * Easy runs paired with the sleep score from the night before. Garmin dates a
  * night's sleep by the morning you wake, so it shares the run's date.
  */
+/**
+ * Runs over 2 km with heart rate, and the cap for "easy": inside zone 2 or
+ * below; without zones, the lower half by heart rate.
+ */
+function easyRuns(runs: Run[], zones: HrZoneSettings | null) {
+  const withHr = runs.filter((r) => r.avgHr && r.distanceM > 2000 && r.durationSec > 0);
+  const hrs = withHr.map((r) => r.avgHr!).sort((a, b) => a - b);
+  const easyCap = zones ? zones.floors[2] - 1 : (hrs[Math.floor(hrs.length / 2)] ?? 0);
+  return { easy: withHr.filter((r) => r.avgHr! <= easyCap), easyCap };
+}
+
+/** Metres covered per heartbeat: higher means more efficient running. */
+const metresPerBeat = (r: Run) => Math.round((r.distanceM / (r.durationSec / 60) / r.avgHr!) * 100) / 100;
+
+const strengthOf = (r: number) => (Math.abs(r) < 0.1 ? "no clear" : Math.abs(r) < 0.3 ? "a weak" : Math.abs(r) < 0.5 ? "a moderate" : "a strong");
+
 export function sleepPerformance(daily: DailyRaw[], runs: Run[], zones: HrZoneSettings | null) {
   const sleepOn = new Map(daily.map((d) => [d.date, d.sleepScore]));
-  const withHr = runs.filter((r) => r.avgHr && r.distanceM > 2000 && r.durationSec > 0);
-  // "Easy": inside zone 2 or below; without zones, the lower half by heart rate.
-  const hrs = withHr.map((r) => r.avgHr!).sort((a, b) => a - b);
-  const easyCap = zones ? zones.floors[2] - 1 : hrs[Math.floor(hrs.length / 2)] ?? 0;
+  const { easy, easyCap } = easyRuns(runs, zones);
 
-  const points: SleepRunPoint[] = withHr
-    .filter((r) => r.avgHr! <= easyCap && typeof sleepOn.get(dateOf(r)) === "number")
+  const points: SleepRunPoint[] = easy
+    .filter((r) => typeof sleepOn.get(dateOf(r)) === "number")
     .map((r) => ({
       id: r.id,
       date: dateOf(r),
       name: r.name,
       sleepScore: sleepOn.get(dateOf(r)) as number,
-      metresPerBeat: Math.round((r.distanceM / (r.durationSec / 60) / r.avgHr!) * 100) / 100,
+      metresPerBeat: metresPerBeat(r),
       paceSecPerKm: Math.round(r.durationSec / (r.distanceM / 1000)),
       avgHr: r.avgHr!,
     }))
@@ -162,7 +175,7 @@ export function sleepPerformance(daily: DailyRaw[], runs: Run[], zones: HrZoneSe
   if (points.length < MIN_RUNS || r === null) {
     verdict = `Not enough easy runs with sleep data yet (${points.length} of ${MIN_RUNS} needed). Check back after a few more weeks.`;
   } else {
-    const strength = Math.abs(r) < 0.1 ? "no clear" : Math.abs(r) < 0.3 ? "a weak" : Math.abs(r) < 0.5 ? "a moderate" : "a strong";
+    const strength = strengthOf(r);
     const direction = r > 0 ? "better sleep goes with more efficient running" : "better sleep goes with less efficient running";
     const compare =
       good.length >= 3 && poor.length >= 3 && goodAvg && poorAvg
@@ -174,6 +187,85 @@ export function sleepPerformance(daily: DailyRaw[], runs: Run[], zones: HrZoneSe
       strength === "no clear"
         ? `No clear link so far between sleep score and easy-run efficiency (r = ${r.toFixed(2)}).${compare}`
         : `There's ${strength} link: ${direction} (r = ${r.toFixed(2)}).${compare} It's a correlation, not proof; heat, terrain and fatigue matter too.`;
+  }
+
+  return { points, r, verdict, easyCap };
+}
+
+/* ---------- Heat and performance ---------- */
+
+export interface HeatRunPoint {
+  id: string;
+  date: string;
+  name: string;
+  /** Dew point at the start: the best single measure of how muggy it was. */
+  dewPointC: number;
+  tempC: number;
+  metresPerBeat: number;
+  paceSecPerKm: number;
+  avgHr: number;
+}
+
+/**
+ * Easy-run efficiency against the dew point at the start. Heat and humidity
+ * push heart rate up at a given pace, so on a muggy day the same effort
+ * covers less ground per heartbeat.
+ */
+/** Weeks of runs the heat insight looks back over. */
+export const HEAT_WEEKS = 16;
+
+export function heatPerformance(runs: Run[], zones: HrZoneSettings | null) {
+  const { easy, easyCap } = easyRuns(runs, zones);
+  const points: HeatRunPoint[] = easy
+    .filter((r) => r.weather?.dewPointC != null)
+    .map((r) => ({
+      id: r.id,
+      date: dateOf(r),
+      name: r.name,
+      dewPointC: r.weather!.dewPointC!,
+      tempC: r.weather!.tempC,
+      metresPerBeat: metresPerBeat(r),
+      paceSecPerKm: Math.round(r.durationSec / (r.distanceM / 1000)),
+      avgHr: r.avgHr!,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const r = pearson(
+    points.map((p) => p.dewPointC),
+    points.map((p) => p.metresPerBeat),
+  );
+  const byDew = [...points].sort((a, b) => a.dewPointC - b.dewPointC);
+  const third = Math.floor(byDew.length / 3);
+  const dry = byDew.slice(0, third);
+  const muggy = byDew.slice(byDew.length - third);
+  const spread = byDew.length ? byDew[byDew.length - 1].dewPointC - byDew[0].dewPointC : 0;
+
+  let verdict: string;
+  if (points.length < MIN_RUNS || r === null) {
+    verdict = `Not enough easy runs with weather yet (${points.length} of ${MIN_RUNS} needed). Weather fills in as Stride syncs.`;
+  } else {
+    const dryAvg = avg(dry.map((p) => p.metresPerBeat))!;
+    const muggyAvg = avg(muggy.map((p) => p.metresPerBeat))!;
+    const pct = Math.round(((muggyAvg - dryAvg) / dryAvg) * 100);
+    const compare =
+      third >= 3 && pct !== 0
+        ? ` On your muggiest third of easy runs (dew point ${Math.round(muggy[0].dewPointC)}°C and up), you covered ${Math.abs(pct)}% ${
+            pct < 0 ? "less" : "more"
+          } distance per heartbeat than on the driest third (${Math.round(dry[dry.length - 1].dewPointC)}°C and below).`
+        : "";
+    // Little contrast: the whole range is narrow, or the driest and muggiest thirds nearly meet.
+    const gap = third ? muggy[0].dewPointC - dry[dry.length - 1].dewPointC : spread;
+    const narrow =
+      spread < 5 || gap < 3
+        ? ` Most of your runs start within a few degrees of dew point (${Math.round(byDew[third]?.dewPointC ?? byDew[0].dewPointC)}–${Math.round(
+            byDew[byDew.length - 1 - third]?.dewPointC ?? byDew[byDew.length - 1].dewPointC,
+          )}°C for the middle third), so there's little contrast to measure.`
+        : "";
+    const strength = strengthOf(r);
+    verdict =
+      strength === "no clear"
+        ? `No clear link so far between humidity and easy-run efficiency (r = ${r.toFixed(2)}).${compare}${narrow}`
+        : `There's ${strength} link: ${r < 0 ? "muggier days go with less efficient running" : "muggier days go with more efficient running"} (r = ${r.toFixed(2)}).${compare}${narrow} It's a correlation; sleep, terrain and fatigue play a part too.`;
   }
 
   return { points, r, verdict, easyCap };
