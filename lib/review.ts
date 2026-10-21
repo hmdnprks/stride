@@ -46,6 +46,8 @@ export interface YearReview {
   weeksTotal: number;
   records: PersonalRecord[];
   body: BodyChange[];
+  /** Active calories over the covered days, kcal, and the part from runs; null without calorie data. */
+  energy: { active: number | null; running: number | null };
 }
 
 const dateOf = (r: Run) => r.startLocal.slice(0, 10);
@@ -163,7 +165,18 @@ export function buildReview(
     weeksTotal: weeks.size,
     records: records.filter((r) => r.date?.startsWith(String(year))),
     body,
+    energy: yearEnergy(days, inYear),
   };
+}
+
+function yearEnergy(days: DailyRaw[], runs: Run[]): YearReview["energy"] {
+  const withKcal = days.filter((d) => typeof d.kcalActive === "number");
+  if (!withKcal.length) return { active: null, running: null };
+  const active = Math.round(withKcal.reduce((a, d) => a + d.kcalActive!, 0));
+  const running = runs.some((r) => typeof r.activeCalories === "number")
+    ? Math.min(active, Math.round(runs.reduce((a, r) => a + (r.activeCalories ?? 0), 0)))
+    : null;
+  return { active, running };
 }
 
 /** Years from the start of stored history to this one, newest first. */

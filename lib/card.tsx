@@ -5,6 +5,7 @@ import path from "node:path";
 import type { ReactNode } from "react";
 import type { Run } from "./garmin/types";
 import { markDataUri, TRACK_BLUE } from "./brand";
+import { FOODS, servings, servingsLabel } from "./energy";
 import { clock, pace, paceOf } from "./format";
 import { routeShape } from "./route-shape";
 import { addDays } from "./trends";
@@ -206,6 +207,9 @@ export function WeekCard({ week, format }: { week: WeekSummary; format: CardForm
     { label: "Longest", value: longest ? (longest / 1000).toFixed(1) : "–", unit: longest ? "km" : undefined },
   ];
   const barH = story ? 420 : 200;
+  // Story only: the week's runs in pizzas (their active calories; the card has no daily totals).
+  const runKcal = week.runs.some((r) => typeof r.activeCalories === "number") ? week.runs.reduce((a, r) => a + (r.activeCalories ?? 0), 0) : null;
+  const pizzas = story && runKcal ? servingsLabel(servings(runKcal, FOODS[0]), FOODS[0]) : null;
 
   return (
     <Frame format={format}>
@@ -213,6 +217,12 @@ export function WeekCard({ week, format }: { week: WeekSummary; format: CardForm
       <div style={{ display: "flex", marginTop: story ? 120 : 48 }}>
         <Distance km={(distanceM / 1000).toFixed(1)} size={story ? 400 : 260} />
       </div>
+      {pizzas && (
+        <div style={{ display: "flex", gap: 16, marginTop: 24, fontSize: 44 }}>
+          <span style={{ color: MUTED }}>Ran off</span>
+          <span style={{ color: WHITE, fontWeight: 500 }}>{pizzas}</span>
+        </div>
+      )}
       <div style={{ display: "flex", flex: 1 }} />
       {/* One bar per day, Monday to Sunday, scaled to the biggest day. */}
       <div style={{ display: "flex", alignItems: "flex-end", marginBottom: story ? 72 : 40 }}>

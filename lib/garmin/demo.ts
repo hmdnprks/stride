@@ -87,19 +87,25 @@ function demoRuns(today: Date, rand: () => number): Run[] {
     day.setHours(5, 30 + Math.floor(rand() * 40), 0, 0);
 
     const weather = demoWeather(day);
+    const durationSec = Math.round((distanceM / 1000) * pace);
+    // About 1 kcal per kg per km for a 62 kg runner, plus resting burn while out.
+    // Noise from the date, not `rand`, so the rest of the demo stays as it was.
+    const activeCalories = Math.round((distanceM / 1000) * 62 * (0.95 + dayNoise(isoDate(day), 13) * 0.1));
     runs.push({
       id: `demo-${back}`,
       name: t.name,
       startLocal: localStamp(day),
       distanceM,
-      durationSec: Math.round((distanceM / 1000) * pace),
+      durationSec,
       // Muggy mornings cost a few beats at the same pace.
       avgHr: Math.round(lerp(t.hr) + (back / 365) * 4 + Math.max(0, weather.dewPointC! - 10) * 0.8),
       elevationGainM: Math.round(lerp([20, 140])),
       load: Math.round(((distanceM / 1000) * pace * t.intensity) / 60),
       loadEstimated: false,
       weather,
-      ...demoDynamics(pace, Math.round((distanceM / 1000) * pace), t.zones),
+      calories: activeCalories + Math.round((durationSec / 86400) * 1690),
+      activeCalories,
+      ...demoDynamics(pace, durationSec, t.zones),
     });
   }
   return runs;
@@ -177,15 +183,30 @@ function demoDay(date: string, daysAgo: number): DailyRaw {
     pred10k: Math.round(fiveK * 2.085),
     predHalf: Math.round(fiveK * 4.66),
     predMarathon: Math.round(fiveK * 9.75),
+    // Walking about; demoDays adds the day's runs on top.
+    kcalResting: 1690,
+    kcalActive: Math.round(260 + n(12) * 300),
+    kcalTotal: null,
   };
+}
+
+/** Demo days from `from` to today, with each day's runs in its active calories. */
+function demoDays(from: string, today: string, runs: Run[]) {
+  const ran = new Map<string, number>();
+  for (const r of runs) ran.set(r.startLocal.slice(0, 10), (ran.get(r.startLocal.slice(0, 10)) ?? 0) + (r.activeCalories ?? 0));
+  return eachDay(from, today).map((date, i, all) => {
+    const d = demoDay(date, all.length - 1 - i);
+    const active = d.kcalActive! + (ran.get(date) ?? 0);
+    return { ...d, kcalActive: active, kcalTotal: active + d.kcalResting! };
+  });
 }
 
 export function getDemoTrends(range: Range): Trends {
   const today = isoDate(new Date());
   const { from } = rangeWindow(range, today);
-  const daily = eachDay(from, today).map((date, i, all) => demoDay(date, all.length - 1 - i));
   // buildTrends uses runs before `from` only for the load warm-up.
   const runs = demoRuns(new Date(), seeded(20261009));
+  const daily = demoDays(from, today, runs);
   return buildTrends(range, daily, runs, [], today);
 }
 
@@ -310,7 +331,7 @@ export function getDemoActivity(id: string): ActivityDetail | null {
   return {
     run,
     maxHr: run.avgHr ? run.avgHr + 14 : null,
-    calories: Math.round(km * 68),
+    calories: run.calories ?? null,
     route,
     samples,
     splits: splitsFromSamples(samples, run.distanceM, run.durationSec),
@@ -322,8 +343,8 @@ export function getDemoActivity(id: string): ActivityDetail | null {
 export function getDemoHistory(days: number) {
   const today = isoDate(new Date());
   const from = addDays(today, -(days - 1));
-  const daily = eachDay(from, today).map((date, i, all) => demoDay(date, all.length - 1 - i));
-  return { daily, runs: demoRuns(new Date(), seeded(20261009)) };
+  const runs = demoRuns(new Date(), seeded(20261009));
+  return { daily: demoDays(from, today, runs), runs };
 }
 
 /** The demo year in review; demo history covers the last 400 days. */
@@ -343,6 +364,6 @@ export const INSIGHT_DAYS = 90;
 export function getDemoInsightsData(): InsightsData {
   const today = isoDate(new Date());
   const from = addDays(today, -(INSIGHT_DAYS - 1));
-  const daily = eachDay(from, today).map((date, i, all) => demoDay(date, all.length - 1 - i));
-  return { daily, runs: demoRuns(new Date(), seeded(20261009)), warnings: [] };
+  const runs = demoRuns(new Date(), seeded(20261009));
+  return { daily: demoDays(from, today, runs), runs, warnings: [] };
 }

@@ -14,12 +14,15 @@ import { addDays, buildTrends, eachDay, isoDate, LOAD_WARMUP_DAYS, rangeWindow }
 const API = "https://connectapi.garmin.com";
 const CHUNK_DAYS = 28;
 const CONCURRENCY = 4;
+/** Days at the end of a window whose calories come from the per-day summary when the report lacks them. */
+const RECENT_CALORIE_DAYS = 3;
 /** Longest span the race-predictor endpoint accepts. */
 const RACE_SPAN_DAYS = 365;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Json = any;
 
+const max = (a: string, b: string) => (a > b ? a : b);
 const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : null);
 
 function chunks(from: string, to: string) {
@@ -73,6 +76,9 @@ export function emptyDay(date: string): DailyRaw {
     pred10k: null,
     predHalf: null,
     predMarathon: null,
+    kcalTotal: null,
+    kcalActive: null,
+    kcalResting: null,
   };
 }
 
@@ -90,8 +96,13 @@ export async function getLiveTrends(range: Range): Promise<Trends> {
   return buildTrends(range, h.daily, h.runs, h.warnings, today);
 }
 
-/** Per-day wellness readings and runs for any date window. */
-export async function fetchHistory(from: string, to: string): Promise<History> {
+export type HistoryMetric = "Body battery" | "Sleep" | "Resting heart rate" | "HRV" | "VO2 max" | "Race predictor" | "Calories" | "Runs";
+
+/**
+ * Per-day wellness readings and runs for any date window. `only` limits the
+ * fetch to some metrics (to backfill one that was added later).
+ */
+export async function fetchHistory(from: string, to: string, only?: HistoryMetric[]): Promise<History> {
   const { gc, save } = await savedClient();
   const get = (url: string, params?: Record<string, unknown>) =>
     gc.get<Json>(`${API}${url}`, params ? { params } : undefined);
@@ -106,7 +117,8 @@ export async function fetchHistory(from: string, to: string): Promise<History> {
     if (day) Object.assign(day, patch);
   };
 
-  async function metric(label: string, load: () => Promise<void>) {
+  async function metric(label: HistoryMetric, load: () => Promise<void>) {
+    if (only && !only.includes(label)) return;
     try {
       await load();
     } catch (err) {
@@ -224,6 +236,25 @@ export async function fetchHistory(from: string, to: string): Promise<History> {
           });
         }
       }
+    }),
+
+    metric("Calories", async () => {
+      await pool(windows, async (w) => {
+        const raw: Json[] = await get(`/usersummary-service/stats/calories/daily/${w.from}/${w.to}`);
+        for (const c of raw ?? []) {
+          const v = c?.values ?? {};
+          set(c?.calendarDate, { kcalTotal: num(v.totalCalories), kcalActive: num(v.activeCalories), kcalResting: num(v.restingCalories) });
+        }
+      });
+      // The report runs a day or two behind; recent days come from each day's summary instead.
+      const recent = eachDay(max(from, addDays(isoDate(new Date()), -(RECENT_CALORIE_DAYS - 1))), to);
+      await pool(
+        recent.filter((date) => days.get(date)?.kcalActive === null),
+        async (date) => {
+          const s = await get(`/usersummary-service/usersummary/daily/${user}`, { calendarDate: date });
+          set(date, { kcalTotal: num(s?.totalKilocalories), kcalActive: num(s?.activeKilocalories), kcalResting: num(s?.bmrKilocalories) });
+        },
+      );
     }),
 
     metric("Runs", async () => {

@@ -61,6 +61,8 @@ export function runsCsv(runs: Run[], { garmin }: { garmin: boolean }) {
     "Feels like (°C)",
     "Dew point (°C)",
     "Humidity (%)",
+    "Calories (kcal)",
+    "Active calories (kcal)",
     "Garmin Connect link",
   ];
   const rows = [...runs]
@@ -85,6 +87,8 @@ export function runsCsv(runs: Run[], { garmin }: { garmin: boolean }) {
       r.weather?.feelsLikeC ?? null,
       r.weather?.dewPointC ?? null,
       r.weather?.humidityPct ?? null,
+      r.calories ?? null,
+      r.activeCalories ?? null,
       garmin ? `https://connect.garmin.com/modern/activity/${r.id}` : null,
     ]);
   return csv(header, rows);
@@ -110,10 +114,13 @@ export function dailyCsv(days: DailyRaw[]) {
     "Predicted 10K",
     "Predicted half marathon",
     "Predicted marathon",
+    "Calories burned (kcal)",
+    "Active calories (kcal)",
+    "Resting calories (kcal)",
   ];
   // Days with no readings at all (watch not worn) are left out.
   const rows = days
-    .filter((d) => Object.entries(d).some(([k, v]) => k !== "date" && v !== null))
+    .filter((d) => Object.entries(d).some(([k, v]) => k !== "date" && v !== null && v !== undefined))
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((d) => [
       d.date,
@@ -134,6 +141,9 @@ export function dailyCsv(days: DailyRaw[]) {
       hms(d.pred10k),
       hms(d.predHalf),
       hms(d.predMarathon),
+      d.kcalTotal ?? null,
+      d.kcalActive ?? null,
+      d.kcalResting ?? null,
     ]);
   return csv(header, rows);
 }

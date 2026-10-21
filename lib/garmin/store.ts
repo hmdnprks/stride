@@ -51,7 +51,11 @@ export interface HistoryMeta {
   lastError: string | null;
   /** Every stored run has its weather (or is known to have none). */
   weatherComplete?: boolean;
-  /** When a weather-only catch-up last ran (ISO), so failures retry hourly at most. */
+  /** Stored days and runs have their calories (added after the first stores were backfilled). */
+  caloriesComplete?: boolean;
+  /** When a catch-up (weather, calories) last ran (ISO), so failures retry hourly at most. */
+  catchUpTriedAt?: string;
+  /** Older name for catchUpTriedAt. */
   weatherTriedAt?: string;
 }
 
@@ -74,7 +78,7 @@ function mergeDay(base: DailyRaw | undefined, next: DailyRaw): DailyRaw {
   if (!base) return next;
   const out = { ...base };
   for (const [k, v] of Object.entries(next) as [keyof DailyRaw, DailyRaw[keyof DailyRaw]][]) {
-    if (v !== null) Object.assign(out, { [k]: v });
+    if (v !== null && v !== undefined) Object.assign(out, { [k]: v });
   }
   return out;
 }
@@ -163,6 +167,18 @@ async function fillWeather(from: string, through: string) {
   return { failed, complete: left === 0 };
 }
 
+/**
+ * Calories for days and runs stored before Stride kept them: the daily
+ * calorie report and the run list, re-fetched for the stored range and merged
+ * in (other readings and run weather are kept).
+ */
+async function backfillCalories(from: string, through: string) {
+  const h = await fetchHistory(from, through, ["Calories", "Runs"]);
+  await writeHistory(h, from, through, !h.warnings.some((w) => w.startsWith("Runs")));
+  if (h.warnings.length) console.warn(`Stride calorie backfill: ${h.warnings.join("; ")}`);
+  return h.warnings.length === 0;
+}
+
 export type SyncResult =
   | { status: "synced"; from: string; through: string; warnings: string[] }
   | { status: "retrying"; attempts: number; warnings: string[] }
@@ -189,11 +205,15 @@ export async function syncHistory(): Promise<SyncResult> {
     await writeHistory(h, from, yesterday, runsOk);
     const weather = await fillWeather(backfilled ? meta!.from! : from, yesterday);
     if (weather.failed) console.warn(`Stride history sync: weather failed for ${weather.failed} runs; retrying next sync.`);
+    // Days fetched just now came with calories; older stored days may not have them.
+    const caloriesComplete =
+      !h.warnings.some((w) => w.startsWith("Calories")) &&
+      (!backfilled || meta!.caloriesComplete || from <= meta!.from! || (await backfillCalories(meta!.from!, addDays(from, -1))));
 
     const attempts = (meta?.attempts ?? 0) + 1;
     const now = new Date().toISOString();
     if (h.warnings.length && attempts < MAX_ATTEMPTS) {
-      await kvSet(META_KEY, { ...(meta ?? { from: null, through: null }), syncedAt: now, attempts, lastError: h.warnings.join("; ") } satisfies HistoryMeta);
+      await kvSet(META_KEY, { ...(meta ?? { from: null, through: null }), syncedAt: now, attempts, lastError: h.warnings.join("; "), caloriesComplete } satisfies HistoryMeta);
       return { status: "retrying", attempts, warnings: h.warnings };
     }
 
@@ -205,6 +225,7 @@ export async function syncHistory(): Promise<SyncResult> {
       attempts: 0,
       lastError: h.warnings.length ? h.warnings.join("; ") : null,
       weatherComplete: weather.complete,
+      caloriesComplete,
     } satisfies HistoryMeta);
     return { status: "synced", from: covered, through: yesterday, warnings: h.warnings };
   } finally {
@@ -213,15 +234,23 @@ export async function syncHistory(): Promise<SyncResult> {
 }
 
 /**
- * Weather only, for a store that's current but has runs without weather
- * (stored before weather existed, or a request failed).
+ * For a store that's current but missing something added later: weather on
+ * runs, calories on days and runs. Also retries a weather fetch that failed.
  */
-async function catchUpWeather(meta: HistoryMeta) {
+async function catchUp(meta: HistoryMeta) {
   if (!meta.from || !meta.through || !(await kvClaim(LOCK_KEY, LOCK_SECONDS))) return;
   try {
-    const weather = await fillWeather(meta.from, meta.through);
+    const caloriesComplete = meta.caloriesComplete || (await backfillCalories(meta.from, meta.through));
+    const weather = meta.weatherComplete ? { complete: true } : await fillWeather(meta.from, meta.through);
     const latest = await getHistoryMeta();
-    if (latest) await kvSet(META_KEY, { ...latest, weatherComplete: weather.complete, weatherTriedAt: new Date().toISOString() } satisfies HistoryMeta);
+    if (latest) {
+      await kvSet(META_KEY, {
+        ...latest,
+        weatherComplete: weather.complete,
+        caloriesComplete,
+        catchUpTriedAt: new Date().toISOString(),
+      } satisfies HistoryMeta);
+    }
   } finally {
     await kvDel(LOCK_KEY);
   }
@@ -232,9 +261,10 @@ export async function syncHistoryIfBehind() {
   const meta = await getHistoryMeta();
   const yesterday = addDays(isoDate(new Date()), -1);
   if (meta?.through && meta.through >= yesterday) {
-    const tried = meta.weatherTriedAt ? Date.parse(meta.weatherTriedAt) : 0;
-    if (!meta.weatherComplete && Date.now() - tried > RETRY_AFTER_MS) {
-      await catchUpWeather(meta).catch((err) => console.warn(`Stride weather catch-up failed: ${err instanceof Error ? err.message : err}`));
+    const triedAt = meta.catchUpTriedAt ?? meta.weatherTriedAt;
+    const tried = triedAt ? Date.parse(triedAt) : 0;
+    if ((!meta.weatherComplete || !meta.caloriesComplete) && Date.now() - tried > RETRY_AFTER_MS) {
+      await catchUp(meta).catch((err) => console.warn(`Stride catch-up failed: ${err instanceof Error ? err.message : err}`));
     }
     return;
   }

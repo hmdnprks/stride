@@ -138,7 +138,8 @@ export function ActivityView({ detail, backHref }: { detail: ActivityDetail; bac
             ["Cadence", run.cadenceSpm ? `${run.cadenceSpm} spm` : null],
             ["Stride length", run.strideCm ? `${(run.strideCm / 100).toFixed(2)} m` : null],
             [run.loadEstimated ? "Training load (est.)" : "Training load", run.load !== null ? String(Math.round(run.load)) : null],
-            ["Calories", detail.calories ? `${Math.round(detail.calories)}` : null],
+            ["Calories", detail.calories ? `${Math.round(detail.calories)} kcal` : null],
+            ["Active calories", run.activeCalories ? `${run.activeCalories} kcal` : null],
           ]
             .filter(([, v]) => v)
             .map(([label, value]) => (

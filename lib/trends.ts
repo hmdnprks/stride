@@ -108,6 +108,15 @@ export function buildTrends(range: Range, daily: DailyRaw[], runs: Run[], warnin
     const bucketRuns = dates.flatMap((d) => runsByDate.get(d) ?? []);
     const zoned = bucketRuns.filter((r) => r.hrZones);
     const zoneH = (z: number) => (zoned.length ? round(zoned.reduce((a, r) => a + r.hrZones![z], 0) / 3600, 2) : null);
+    // Calories add up across a bucket rather than average.
+    const sum = (vals: (number | null | undefined)[]) => {
+      const v = vals.filter((x): x is number => typeof x === "number");
+      return v.length ? Math.round(v.reduce((a, b) => a + b, 0)) : null;
+    };
+    const kcalActive = sum(days.map((d) => d.kcalActive));
+    // Runs are part of the day's active calories; capped so rounding can't push running above it.
+    const kcalRunning = sum(bucketRuns.filter((r) => typeof byDate.get(r.startLocal.slice(0, 10))?.kcalActive === "number").map((r) => r.activeCalories));
+    const running = kcalActive === null ? null : Math.min(kcalRunning ?? 0, kcalActive);
     // Race predictions: the most recent reading in the bucket.
     const latest = (f: (d: DailyRaw) => number | null) => {
       for (let i = days.length - 1; i >= 0; i--) {
@@ -148,6 +157,9 @@ export function buildTrends(range: Range, daily: DailyRaw[], runs: Run[], warnin
       pred10k: latest((d) => d.pred10k),
       predHalf: latest((d) => d.predHalf),
       predMarathon: latest((d) => d.predMarathon),
+      kcalResting: sum(days.map((d) => d.kcalResting)),
+      kcalRunning: running,
+      kcalOtherActive: kcalActive === null || running === null ? null : kcalActive - running,
     };
   });
 

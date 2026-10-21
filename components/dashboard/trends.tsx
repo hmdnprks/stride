@@ -341,6 +341,47 @@ function HeartRateZones({ trends, settings }: { trends: Trends; settings: HrZone
   );
 }
 
+/* Calories */
+
+function ActiveCalories({ trends }: { trends: Trends }) {
+  const weekly = trends.bucket === "week";
+  const p = trends.points.filter((pt) => pt.kcalRunning !== null || pt.kcalOtherActive !== null);
+  const sum = (key: "kcalRunning" | "kcalOtherActive" | "kcalResting") => p.reduce((a, pt) => a + (pt[key] ?? 0), 0);
+  const active = sum("kcalRunning") + sum("kcalOtherActive");
+  const resting = trends.points.filter((pt) => pt.kcalResting !== null);
+  const restingPerDay = resting.length ? sum("kcalResting") / (weekly ? resting.length * 7 : resting.length) : null;
+  const kcal = (v: number) => Math.round(v).toLocaleString("en-GB");
+
+  const summary = p.length
+    ? [
+        `${kcal(active)} active kcal, ${active ? Math.round((sum("kcalRunning") / active) * 100) : 0}% of it from running.`,
+        restingPerDay !== null && `Resting adds about ${kcal(restingPerDay)} a day, run or not, so it isn't stacked here.`,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : "No calorie data in this range yet.";
+
+  return (
+    <TrendChart
+      title={weekly ? "Active calories per week" : "Active calories per day"}
+      summary={summary}
+      rows={trends.points}
+      bucket={trends.bucket}
+      layers={[
+        {
+          kind: "stack",
+          parts: [
+            { key: "kcalRunning", label: "Running", color: "var(--series)" },
+            { key: "kcalOtherActive", label: "Everything else", color: "var(--stage-awake)" },
+          ],
+        },
+      ]}
+      format={(v) => `${kcal(v)} kcal`}
+      height={200}
+    />
+  );
+}
+
 /* Runs tab */
 
 export function RunningTrends({ trends, hrZones }: { trends: Trends; hrZones: HrZoneSettings | null }) {
@@ -367,6 +408,7 @@ export function RunningTrends({ trends, hrZones }: { trends: Trends; hrZones: Hr
         format={(v) => `${Number.isInteger(v) ? v : v.toFixed(1)} km`}
         height={220}
       />
+      <ActiveCalories trends={trends} />
       <HeartRateZones trends={trends} settings={hrZones} />
       <PaceHrChart runs={trends.runs} />
 

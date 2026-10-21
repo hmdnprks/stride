@@ -17,6 +17,14 @@ export function withLoad(run: Omit<Run, "loadEstimated"> & { loadEstimated?: boo
   return { ...run, load: Math.round(load), loadEstimated: true };
 }
 
+/**
+ * Garmin's run calories include the resting (BMR) calories burned during the
+ * run; the active part is what the run added on top.
+ */
+export function runCalories(total: number | null, bmr: number | null) {
+  return { calories: total, activeCalories: total !== null && bmr !== null ? Math.max(0, Math.round(total - bmr)) : null };
+}
+
 /** One activity from Connect's activity list, as a Run. */
 export function mapRun(a: any): Run {
   const zones = [1, 2, 3, 4, 5].map((z) => num(a[`hrTimeInZone_${z}`]));
@@ -34,5 +42,6 @@ export function mapRun(a: any): Run {
     strideCm: num(a.avgStrideLength),
     groundContactMs: num(a.avgGroundContactTime),
     verticalRatioPct: num(a.avgVerticalRatio),
+    ...runCalories(num(a.calories), num(a.bmrCalories)),
   });
 }

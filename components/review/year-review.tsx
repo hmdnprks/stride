@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Run } from "@/lib/garmin/types";
 import type { BodyChange, MonthSplit, YearReview } from "@/lib/review";
+import { FOODS } from "@/lib/energy";
 import { hm, km, pace, paceOf } from "@/lib/format";
 import { Sparkline } from "../charts/sparkline";
 import { StatNumber } from "../stat-number";
@@ -154,11 +155,12 @@ function Highlight({ label, value, unit, note, href }: { label: string; value: s
 }
 
 function Highlights({ review, runHref }: { review: YearReview; runHref: (id: string) => string }) {
-  const { longest, fastest, biggestWeek, weeksActive, weeksTotal } = review;
+  const { longest, fastest, biggestWeek, weeksActive, weeksTotal, energy } = review;
+  const pizza = FOODS[0];
   const runNote = (r: Run) => `${r.name}, ${dayMonth(r.startLocal.slice(0, 10))}`;
 
   return (
-    <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-5">
       {longest && <Highlight label="Longest run" value={km(longest.distanceM)} unit="km" note={runNote(longest)} href={runHref(longest.id)} />}
       {fastest && (
         <Highlight label="Fastest run over 5 km" value={pace(paceOf(fastest))} unit="/km" note={runNote(fastest)} href={runHref(fastest.id)} />
@@ -172,6 +174,14 @@ function Highlights({ review, runHref }: { review: YearReview; runHref: (id: str
         />
       )}
       <Highlight label="Weeks with a run" value={String(weeksActive)} unit={`of ${weeksTotal}`} note={consistency(weeksActive, weeksTotal)} />
+      {energy.active !== null && energy.active >= pizza.kcal && (
+        <Highlight
+          label="Burned off"
+          value={thousands(Math.round(energy.active / pizza.kcal))}
+          unit={pizza.many}
+          note={`${thousands(energy.active)} active kcal${energy.running !== null ? `, ${thousands(energy.running)} from running` : ""}. One pizza is about ${thousands(pizza.kcal)} kcal.`}
+        />
+      )}
     </div>
   );
 }

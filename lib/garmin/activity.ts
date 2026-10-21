@@ -1,7 +1,7 @@
 import "server-only";
 
 import { savedClient } from "./auth";
-import { withLoad } from "./map";
+import { runCalories, withLoad } from "./map";
 import { mapWeather } from "./weather";
 import type { ActivityDetail, ActivitySample, Run, Split } from "./types";
 
@@ -55,6 +55,7 @@ export async function getLiveActivity(id: string): Promise<ActivityDetail | null
     groundContactMs: num(s.groundContactTime),
     verticalRatioPct: num(s.verticalRatio),
     weather,
+    ...runCalories(num(s.calories), num(s.bmrCalories)),
   });
 
   const [details, laps] = await Promise.all([

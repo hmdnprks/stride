@@ -82,3 +82,19 @@ Notes:
 
 - Some Garmin watches (including the one this was built against) report Training Effect but not per-run training load, and Garmin's training-status endpoint returns nothing for them. Every run still has heart-rate zone times, so Stride can estimate load from those.
 - Weather comes from Garmin's own per-activity record (nearest weather station at the start) rather than Open-Meteo as first planned: no run location leaves Garmin, and it matches what Garmin Connect shows. Each run's weather is fetched once and stored.
+
+## ✅ Phase 7 — Energy (shipped)
+
+- [x] Checked against this account: each activity has `calories` and `bmrCalories`; days come from Garmin's calorie report (`/usersummary-service/stats/calories/daily`), which runs a day or two behind, so the last few days use each day's summary instead
+- [x] Calories on every stored run (total, and active = total minus the resting part), from the activity list Stride already downloads; shown on the run page and in the CSV
+- [x] Daily calories (total, active and resting) in the daily snapshots: stored history backfilled once (about 15 report calls plus the run list), then kept up by every sync
+- [x] Active calories per day or week, following the range switcher, split into running and everything else (Runs tab)
+- [x] "Burned off": this week's and this month's active calories as servings of a food you pick (pizza, nasi goreng, burger, doughnut, banana), drawn as that many pieces, the last one part-filled
+- [x] Year in review: the year's active calories in pizzas; week share card (story): the week's runs in pizzas
+
+Notes:
+
+- Food counts use active calories only. Resting (BMR) calories are burned whether you run or not, so counting them would make a rest day look like several pizzas.
+- "From running" only counts runs on days that have a calorie total, so it stays a part of the whole.
+- Garmin's calories are estimates from heart rate and body size, and the food values are rounded typical servings (`lib/energy.ts`); the page says so.
+- Days without calories in Garmin are days the watch wasn't worn; Garmin has nothing for them either.

@@ -50,6 +50,10 @@ Locally, neither is required: with no database configured, data is kept in `.str
 
 Each run's start conditions (temperature, feels-like, dew point, humidity, wind) come from Garmin's record of the nearest weather station, so no location goes to a third-party service. They're fetched once per run during a sync and stored with the run; a page load fills in any that are missing. The run page shows them, the runs CSV includes them, and **Does heat slow you down?** on the Fitness tab plots easy-run efficiency (metres per heartbeat) against dew point over the last 16 weeks.
 
+## Calories
+
+Each day's calories (total, active and resting) come from Garmin's calorie report, and each run's from the activity list, so they cost almost no extra requests. On the Runs tab, **Burned off** shows this week's and this month's active calories as servings of a food you pick, drawn as that many pieces, and the running trends chart active calories per day or week, split into running and everything else. Only active calories count towards the food: resting calories are burned whether you run or not. The year in review counts the year in pizzas, and a week's story card counts its runs. Food values are rounded typical servings in `lib/energy.ts`.
+
 ## Share cards
 
 **Share run** on a run's page and **Share this week** under the weekly summary make an image in the watch-face style: the distance huge and condensed, then time, pace, heart rate and climb (or, for a week, a bar for each day). Pick **Story** (1080×1920) or **Square** (1080×1080), then **Share** opens the phone's share sheet, or **Download** saves the PNG. A run's story card can draw the route shape; that's off by default, since a route often starts at home.
@@ -102,6 +106,7 @@ lib/garmin/history.ts      Garmin Connect history for the trend charts
 lib/garmin/store.ts        Stored daily history: sync, backfill, store + live reads
 lib/export.ts              CSV for runs and daily readings
 lib/review.ts              Year in review: monthly splits, highlights, body changes
+lib/energy.ts              Active calories this week and month, and food servings
 lib/card.tsx               Share card layouts (run, week; story, square)
 app/api/card/[kind]/[id]   Share card images
 components/share/          Share panel: preview, size, route, share or download

@@ -87,6 +87,9 @@ export interface Run {
   verticalRatioPct: number | null;
   /** Start conditions; null when Garmin has none (treadmill), absent until fetched. */
   weather?: RunWeather | null;
+  /** Garmin's calorie estimate for the run, kcal: all of it, and the part above resting (BMR). Absent on runs stored before calories were kept. */
+  calories?: number | null;
+  activeCalories?: number | null;
 }
 
 export interface Dashboard {
@@ -134,6 +137,10 @@ export interface DailyRaw {
   pred10k: number | null;
   predHalf: number | null;
   predMarathon: number | null;
+  /** Calories burned that day, kcal: active (above resting) plus resting (BMR) makes the total. Absent on days stored before calories were kept. */
+  kcalTotal?: number | null;
+  kcalActive?: number | null;
+  kcalResting?: number | null;
 }
 
 /** One chart position: a day, or a week (Mon–Sun) on longer ranges. */
@@ -175,6 +182,10 @@ export interface TrendPoint {
   pred10k: number | null;
   predHalf: number | null;
   predMarathon: number | null;
+  /** Calories burned across the bucket, kcal: resting, active from runs, and the rest of the active part. */
+  kcalResting: number | null;
+  kcalRunning: number | null;
+  kcalOtherActive: number | null;
 }
 
 export interface RunPoint {
