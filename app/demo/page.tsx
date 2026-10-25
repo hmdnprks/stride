@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { Dashboard, DashboardSkeleton } from "@/components/dashboard";
-import { getDemoDashboard, getDemoExtras, getDemoInsightsData, getDemoTrends } from "@/lib/garmin";
+import { getDemoDashboard, getDemoExtras, getDemoHistory, getDemoInsightsData, getDemoTrends } from "@/lib/garmin";
 import { requireUnlocked } from "@/lib/gate-server";
 import { getSettings } from "@/lib/settings";
 import { parseRange } from "@/lib/trends";
@@ -20,6 +20,7 @@ async function DemoDashboard({ searchParams }: { searchParams: PageProps<"/demo"
       trends={getDemoTrends(range)}
       extras={getDemoExtras()}
       insights={getDemoInsightsData()}
+      history={{ ...getDemoHistory(400), warnings: [] }}
       settings={await getSettings("demo")}
     />
   );

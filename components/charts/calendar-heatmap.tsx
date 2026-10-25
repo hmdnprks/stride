@@ -152,18 +152,20 @@ export function CalendarHeatmap({ days }: { days: CalendarDay[] }) {
             {days.map((d, i) => {
               const { x, y } = pos(i);
               return (
-                <rect
-                  key={d.date}
-                  x={x}
-                  y={y}
-                  width={CELL}
-                  height={CELL}
-                  rx={3}
-                  fill={LEVELS[level(d.km)].color}
-                  stroke={hover === i ? "var(--foreground)" : "none"}
-                  strokeWidth={1.5}
-                  onPointerEnter={() => setHover(i)}
-                />
+                <g key={d.date} onPointerEnter={() => setHover(i)}>
+                  <rect
+                    x={x}
+                    y={y}
+                    width={CELL}
+                    height={CELL}
+                    rx={3}
+                    fill={LEVELS[level(d.km)].color}
+                    stroke={hover === i ? "var(--foreground)" : "none"}
+                    strokeWidth={1.5}
+                  />
+                  {/* Race days get a ring, like a medal on the wall. */}
+                  {d.race && <circle cx={x + CELL / 2} cy={y + CELL / 2} r={CELL * 0.22} fill="none" stroke="var(--background)" strokeWidth={2} />}
+                </g>
               );
             })}
           </svg>
@@ -187,7 +189,7 @@ export function CalendarHeatmap({ days }: { days: CalendarDay[] }) {
                 {WEEKDAYS[hover % 7]} {shortDay(h.date)}
               </p>
               <p className="font-semibold tabular-nums">
-                {h.runs ? `${h.km} km, ${h.runs} ${h.runs === 1 ? "run" : "runs"}` : "Rest day"}
+                {h.race ? `Race, ${h.km} km` : h.runs ? `${h.km} km, ${h.runs} ${h.runs === 1 ? "run" : "runs"}` : "Rest day"}
               </p>
             </div>
           );
@@ -201,6 +203,15 @@ export function CalendarHeatmap({ days }: { days: CalendarDay[] }) {
             {l.label}
           </li>
         ))}
+        {days.some((d) => d.race) && (
+          <li className="flex items-center gap-1.5">
+            <svg width={10} height={10} aria-hidden>
+              <rect width={10} height={10} rx={3} fill="var(--stage-deep)" />
+              <circle cx={5} cy={5} r={2.2} fill="none" stroke="var(--background)" strokeWidth={1.6} />
+            </svg>
+            Race
+          </li>
+        )}
       </ul>
 
       <details className="group text-sm">

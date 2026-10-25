@@ -1,8 +1,10 @@
 import type { Dashboard as Data, InsightsData, RunningExtras, StrideSettings, Trends } from "@/lib/garmin";
 import { goalProgress, racePlan, recoveryCheck, heatPerformance, HEAT_WEEKS, sleepPerformance, weeklySummary } from "@/lib/insights";
 import { energyBurned } from "@/lib/energy";
+import { buildRaces } from "@/lib/races";
 import { addDays, isoDate } from "@/lib/trends";
 import { DistanceGoals, RaceCountdown } from "./goals";
+import { PastRaces } from "./races";
 import { DashboardFrame } from "./frame";
 import { FitnessView, RunsView, TodayView } from "./views";
 
@@ -11,12 +13,15 @@ export function Dashboard({
   trends,
   extras,
   insights,
+  history,
   settings,
 }: {
   data: Data;
   trends: Trends;
   extras: RunningExtras;
   insights: InsightsData;
+  /** All stored days and runs, for past races. */
+  history: InsightsData;
   settings: StrideSettings;
 }) {
   const today = isoDate(new Date());
@@ -29,7 +34,9 @@ export function Dashboard({
   const energy = energyBurned(daily, runs, today);
   const goals = goalProgress(extras.calendar, settings, today);
   const last28Km = runs.filter((r) => r.startLocal.slice(0, 10) > addDays(today, -28)).reduce((a, r) => a + r.distanceM, 0) / 1000;
-  const plan = settings.race ? racePlan(settings.race, last28Km / 4, data.racePredictions, today) : null;
+  const races = buildRaces(settings.races, history.runs, history.daily, today);
+  const next = races.upcoming[0] ?? null;
+  const plan = next ? racePlan(next, last28Km / 4, data.racePredictions, today) : null;
   const synced = new Date(data.fetchedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   return (
     <DashboardFrame
@@ -42,10 +49,11 @@ export function Dashboard({
         runs: <RunsView data={data} trends={trends} extras={extras} energy={energy} />,
         goals: (
           <div className="flex flex-col gap-16">
-            <RaceCountdown source={data.source} race={settings.race} plan={plan} />
+            <RaceCountdown source={data.source} race={next} plan={plan} latest={races.past[0] ?? null} later={races.upcoming.slice(1)} />
+            <PastRaces source={data.source} races={races.past} />
             <DistanceGoals source={data.source} goals={goals} />
             <p className="text-sm text-muted-foreground">
-              Goals and your race are saved on this computer, separately for {data.source === "demo" ? "the demo" : "your Garmin data"}.
+              Goals and races are saved on this computer, separately for {data.source === "demo" ? "the demo" : "your Garmin data"}.
             </p>
           </div>
         ),

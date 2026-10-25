@@ -200,6 +200,7 @@ export function buildCalendar(runs: Run[], today = isoDate(new Date())): Calenda
     if (!day) continue;
     day.km = Math.round((day.km + r.distanceM / 1000) * 10) / 10;
     day.runs += 1;
+    if (r.race) day.race = true;
   }
   return [...byDate.values()];
 }

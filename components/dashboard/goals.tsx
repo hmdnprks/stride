@@ -1,13 +1,17 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { clearRaceAction, saveGoalAction, saveRaceAction, type RaceFormState } from "@/app/actions";
+import Link from "next/link";
+import { removeRaceAction, saveGoalAction, saveRaceAction, type RaceFormState } from "@/app/actions";
 import type { DataSource, RaceGoal } from "@/lib/garmin/types";
 import type { GoalProgress, racePlan } from "@/lib/insights";
-import { addDays } from "@/lib/trends";
+import { clock, pace } from "@/lib/format";
+import type { FinishedRace } from "@/lib/races";
+import { addDays, isoDate } from "@/lib/trends";
 import { cn } from "@/lib/utils";
 import { InlineEdit } from "../uselayouts/inline-edit";
 import { StatusButton } from "../uselayouts/save-button";
+import { BuildUp, RunPicker, runHref, versusPrediction } from "./races";
 
 type Plan = ReturnType<typeof racePlan>;
 
@@ -90,6 +94,7 @@ function RaceForm({ source, race, onDone }: { source: DataSource; race: RaceGoal
   return (
     <form action={action} className="flex flex-col gap-5">
       <input type="hidden" name="source" value={source} />
+      {race && <input type="hidden" name="id" value={race.id} />}
       <input type="hidden" name="distance" value={distance} />
       <label className="flex flex-col gap-2">
         <span className="text-sm font-medium">Race name</span>
@@ -145,7 +150,7 @@ function RaceForm({ source, race, onDone }: { source: DataSource; race: RaceGoal
           status={pending ? "loading" : "idle"}
           labels={{ idle: race ? "Save race" : "Set race", loading: "Saving", success: "Saved" }}
         />
-        {onDone && race && (
+        {onDone && (
           <button type="button" onClick={onDone} className="h-12 px-4 text-sm text-muted-foreground hover:text-foreground">
             Cancel
           </button>
@@ -155,67 +160,195 @@ function RaceForm({ source, race, onDone }: { source: DataSource; race: RaceGoal
   );
 }
 
-export function RaceCountdown({ source, race, plan }: { source: DataSource; race: RaceGoal | null; plan: Plan | null }) {
-  const [editing, setEditing] = useState(false);
+/** A finished race shown this many days after, in place of the countdown. */
+const RESULT_DAYS = 21;
+const daysSince = (date: string) => Math.round((Date.parse(`${isoDate(new Date())}T12:00:00`) - Date.parse(`${date}T12:00:00`)) / 86_400_000);
+const ago = (days: number) => (days <= 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`);
 
-  if (!race || !plan || editing) {
-    return (
-      <section className="grid gap-8 rounded-[2rem] border-2 border-border p-6 sm:p-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <div className="flex flex-col gap-2">
-          <h2 className="wide text-xl leading-tight font-bold">{race ? "Edit your race" : "Training for a race?"}</h2>
-          <p className="text-muted-foreground">
-            Add it and Stride counts down, tells you when to start tapering, and shows Garmin&apos;s predicted finish time.
+function FormCard({ source, race, title, onDone }: { source: DataSource; race: RaceGoal | null; title: string; onDone?: () => void }) {
+  return (
+    <section className="grid gap-8 rounded-[2rem] border-2 border-border p-6 sm:p-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <div className="flex flex-col gap-2">
+        <h2 className="wide text-xl leading-tight font-bold">{title}</h2>
+        <p className="text-muted-foreground">
+          Add it and Stride counts down, tells you when to start tapering, and shows Garmin&apos;s predicted finish time. After race day,
+          it keeps your result.
+        </p>
+      </div>
+      <RaceForm source={source} race={race} onDone={onDone} />
+    </section>
+  );
+}
+
+const panelButton = "h-10 rounded-full bg-panel-foreground/15 px-4 text-sm font-semibold hover:bg-panel-foreground/25";
+
+/** The latest race's result, for a few weeks after race day. */
+function RaceResult({ source, race }: { source: DataSource; race: FinishedRace }) {
+  const vs = versusPrediction(race);
+  return (
+    <section className="flex flex-col gap-8 rounded-[2rem] bg-panel p-6 text-panel-foreground sm:p-8">
+      <div className="flex flex-col gap-1">
+        <span className="text-sm font-medium text-panel-muted">Finished {ago(daysSince(race.date))}</span>
+        <h2 className="wide text-xl leading-tight font-bold sm:text-2xl">{race.name}</h2>
+        <p className="text-panel-muted">
+          {distanceLabel(race.distanceKm)} on {longDate(race.date)}
+        </p>
+      </div>
+
+      {race.run ? (
+        <div className="flex flex-wrap items-end gap-x-12 gap-y-4">
+          <p className="flex flex-col gap-1">
+            <span className="num text-[4.5rem] leading-none font-bold sm:text-[7rem]">{clock(race.run.durationSec)}</span>
+            <span className="text-panel-muted">{vs ?? "Finish time"}</span>
           </p>
+          <dl className="flex gap-10 pb-2">
+            <div className="flex flex-col gap-1">
+              <dt className="text-sm text-panel-muted">Pace</dt>
+              <dd className="num text-[2.375rem] font-semibold">{pace(race.run.paceSecPerKm)}</dd>
+            </div>
+            {race.run.avgHr && (
+              <div className="flex flex-col gap-1">
+                <dt className="text-sm text-panel-muted">Heart rate</dt>
+                <dd className="num text-[2.375rem] font-semibold">{race.run.avgHr}</dd>
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
+              <dt className="text-sm text-panel-muted">On your watch</dt>
+              <dd className="num text-[2.375rem] font-semibold">{race.run.distanceKm}</dd>
+            </div>
+          </dl>
         </div>
-        <RaceForm source={source} race={race} onDone={race ? () => setEditing(false) : undefined} />
-      </section>
-    );
+      ) : (
+        <p className="max-w-[64ch]">Stride couldn&apos;t find the run for this race on {longDate(race.date)}.</p>
+      )}
+
+      <BuildUp race={race} tone="panel" />
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <RunPicker source={source} race={race} tone="panel" />
+        {race.run && (
+          <Link href={runHref(source, race.run.id)} className={`${panelButton} inline-flex items-center`}>
+            View the run
+          </Link>
+        )}
+      </div>
+    </section>
+  );
+}
+
+type Mode = { kind: "add" } | { kind: "edit"; race: RaceGoal } | null;
+
+export function RaceCountdown({
+  source,
+  race,
+  plan,
+  latest,
+  later,
+}: {
+  source: DataSource;
+  /** The next race, or null. */
+  race: RaceGoal | null;
+  plan: Plan | null;
+  /** The most recent finished race, shown for a while when nothing is coming up. */
+  latest: FinishedRace | null;
+  /** Races after the next one. */
+  later: RaceGoal[];
+}) {
+  const [mode, setMode] = useState<Mode>(null);
+  const close = () => setMode(null);
+
+  if (mode?.kind === "edit") return <FormCard source={source} race={mode.race} title="Edit your race" onDone={close} />;
+  if (mode?.kind === "add") return <FormCard source={source} race={null} title={race ? "Add another race" : "Your next race"} onDone={close} />;
+
+  if (!race || !plan) {
+    if (latest && daysSince(latest.date) <= RESULT_DAYS) {
+      return (
+        <div className="flex flex-col gap-4">
+          <RaceResult source={source} race={latest} />
+          <button
+            type="button"
+            onClick={() => setMode({ kind: "add" })}
+            className="h-11 self-start rounded-full px-4 text-sm font-semibold outline outline-1 outline-border hover:outline-foreground"
+          >
+            Add your next race
+          </button>
+        </div>
+      );
+    }
+    return <FormCard source={source} race={null} title="Training for a race?" />;
   }
 
   return (
-    <section className="flex flex-col gap-6 rounded-[2rem] bg-panel p-6 text-panel-foreground sm:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-panel-muted">{PHASE_LABEL[plan.phase]}</span>
-          <h2 className="wide text-xl leading-tight font-bold sm:text-2xl">{race.name}</h2>
-          <p className="text-panel-muted">
-            {distanceLabel(race.distanceKm)} on {longDate(race.date)}
-          </p>
+    <div className="flex flex-col gap-4">
+      <section className="flex flex-col gap-6 rounded-[2rem] bg-panel p-6 text-panel-foreground sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-panel-muted">{PHASE_LABEL[plan.phase]}</span>
+            <h2 className="wide text-xl leading-tight font-bold sm:text-2xl">{race.name}</h2>
+            <p className="text-panel-muted">
+              {distanceLabel(race.distanceKm)} on {longDate(race.date)}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setMode({ kind: "edit", race })} className={panelButton}>
+              Edit race
+            </button>
+            <button
+              type="button"
+              onClick={() => void removeRaceAction(source, race.id)}
+              className="h-10 rounded-full px-4 text-sm text-panel-muted hover:text-panel-foreground"
+            >
+              Remove
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="h-10 rounded-full bg-panel-foreground/15 px-4 text-sm font-semibold hover:bg-panel-foreground/25"
-          >
-            Edit race
-          </button>
-          <button
-            type="button"
-            onClick={() => void clearRaceAction(source)}
-            className="h-10 rounded-full px-4 text-sm text-panel-muted hover:text-panel-foreground"
-          >
-            Remove
-          </button>
-        </div>
-      </div>
 
-      <div className="flex flex-wrap items-end gap-x-12 gap-y-4">
-        <p className="flex items-baseline gap-3">
-          <span className="num text-[6rem] font-bold sm:text-[9rem]">{Math.max(0, plan.daysToGo)}</span>
-          <span className="text-lg text-panel-muted">{plan.daysToGo === 1 ? "day to go" : "days to go"}</span>
-        </p>
-        {plan.predicted && (
-          <p className="flex flex-col gap-1 pb-3">
-            <span className="text-sm text-panel-muted">Garmin predicts</span>
-            <span className="num text-[3rem] font-semibold">{plan.predicted}</span>
+        <div className="flex flex-wrap items-end gap-x-12 gap-y-4">
+          <p className="flex items-baseline gap-3">
+            <span className="num text-[6rem] font-bold sm:text-[9rem]">{Math.max(0, plan.daysToGo)}</span>
+            <span className="text-lg text-panel-muted">{plan.daysToGo === 1 ? "day to go" : "days to go"}</span>
           </p>
-        )}
-      </div>
+          {plan.predicted && (
+            <p className="flex flex-col gap-1 pb-3">
+              <span className="text-sm text-panel-muted">Garmin predicts</span>
+              <span className="num text-[3rem] font-semibold">{plan.predicted}</span>
+            </p>
+          )}
+        </div>
 
-      {plan.phase !== "done" && <PhaseStrip plan={plan} race={race} />}
-      <p className="max-w-[64ch] text-base leading-relaxed">{plan.advice}</p>
-    </section>
+        {plan.phase !== "done" && <PhaseStrip plan={plan} race={race} />}
+        <p className="max-w-[64ch] text-base leading-relaxed">{plan.advice}</p>
+      </section>
+
+      {later.length > 0 && (
+        <ul className="flex flex-col">
+          {later.map((r) => (
+            <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-border py-3">
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-semibold">{r.name}</span>
+                <span className="text-sm text-muted-foreground">
+                  {distanceLabel(r.distanceKm)} on {longDate(r.date)}
+                </span>
+              </span>
+              <span className="flex items-center gap-4 text-sm">
+                <button type="button" onClick={() => setMode({ kind: "edit", race: r })} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  Edit
+                </button>
+                <button type="button" onClick={() => void removeRaceAction(source, r.id)} className="text-muted-foreground hover:text-foreground">
+                  Remove
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button
+        type="button"
+        onClick={() => setMode({ kind: "add" })}
+        className="h-11 self-start rounded-full px-4 text-sm font-semibold outline outline-1 outline-border hover:outline-foreground"
+      >
+        Add another race
+      </button>
+    </div>
   );
 }
 

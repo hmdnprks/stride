@@ -3,7 +3,7 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { getLiveDashboard } from "./live";
 import { getLiveTrends } from "./history";
-import { getHistoryMeta, loadHistory } from "./store";
+import { getHistoryMeta, loadAllHistory, loadHistory } from "./store";
 import { buildReview, reviewYears } from "../review";
 import { addDays, isoDate } from "../trends";
 import { getLiveExtras } from "./extras";
@@ -87,6 +87,14 @@ export async function getGarminReview(year: number) {
     years,
     warnings: [...history.warnings, ...extras.warnings],
   };
+}
+
+/** Every stored day and run, for past races; cleared by Sync. */
+export async function getGarminAllHistory() {
+  "use cache";
+  cacheTag(GARMIN_CACHE_TAG);
+  cacheLife({ stale: 300, revalidate: 900, expire: 3600 });
+  return loadAllHistory();
 }
 
 /** Runs between two dates (inclusive), for the week share card; cleared by Sync. */

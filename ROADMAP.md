@@ -98,3 +98,20 @@ Notes:
 - "From running" only counts runs on days that have a calorie total, so it stays a part of the whole.
 - Garmin's calories are estimates from heart rate and body size, and the food values are rounded typical servings (`lib/energy.ts`); the page says so.
 - Days without calories in Garmin are days the watch wasn't worn; Garmin has nothing for them either.
+
+## ✅ Phase 8 — Races (shipped)
+
+- [x] Checked against this account: the activity list marks races with `eventType.typeKey === "race"` (3 of 143 runs); the activity detail has it as `eventTypeDTO`
+- [x] Race mark kept on every stored run; stored history backfilled once from the run list, then kept up by every sync
+- [x] Any number of races in Stride (the single saved race carries over); the soonest upcoming one gets the countdown and taper plan, later ones are listed under it
+- [x] After race day, the race's run is found automatically (marked as a race in Garmin, else closest to the race distance within 15%), or picked by hand from runs around race day
+- [x] Race result in place of the countdown for three weeks: finish time against Garmin's prediction the week before, pace, heart rate, watch distance, and weekly km over the 8 weeks before
+- [x] Past races: every goal race plus runs marked as races in Garmin, with the best time at each distance marked
+- [x] Race days ringed on the training calendar; Race tag on the run page; Race column in the runs CSV
+- [ ] Race share card
+- [ ] Races in the year in review
+
+Notes:
+
+- A goal race on today's date stays a countdown until its run shows up.
+- The prediction comparison only shows when the run is within 10% of the race distance, so a hand-picked warm-up isn't compared with a half-marathon prediction.

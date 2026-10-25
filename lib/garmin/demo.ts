@@ -67,6 +67,55 @@ function demoWeather(day: Date): RunWeather {
   };
 }
 
+/**
+ * Races in the demo year, on Sundays: a half set as a goal in Stride, and two
+ * 10Ks only marked as races in Garmin, the later one faster.
+ */
+export function DEMO_RACES(today = new Date()) {
+  const sundayBefore = (weeks: number) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - ((d.getDay() + 7) % 7) - weeks * 7);
+    return { back: Math.round((today.getTime() - d.getTime()) / 86_400_000), date: isoDate(d) };
+  };
+  return [
+    { ...sundayBefore(7), name: "Riverside Half Marathon", km: 21.0975, goal: true, effort: 0.995 },
+    { ...sundayBefore(20), name: "Harbour 10K", km: 10, goal: false, effort: 0.985 },
+    { ...sundayBefore(41), name: "Spring 10K", km: 10, goal: false, effort: 1.01 },
+  ];
+}
+
+/** Swap in race runs on race days; their own numbers, so the seeded runs around them stay as they were. */
+function withDemoRaces(runs: Run[], today: Date): Run[] {
+  const zones = [0.01, 0.04, 0.2, 0.55, 0.2];
+  const races = DEMO_RACES(today).map((r): Run => {
+    const day = demoDay(r.date, r.back);
+    const predicted = r.km === 5 ? day.pred5k! : r.km === 10 ? day.pred10k! : day.predHalf!;
+    const durationSec = Math.round(predicted * r.effort);
+    const distanceM = Math.round(r.km * 1000 * 1.008);
+    const start = new Date(`${r.date}T07:00:00`);
+    const weather = demoWeather(start);
+    const activeCalories = Math.round(r.km * 66);
+    return {
+      id: `demo-${r.back}`,
+      name: r.name,
+      startLocal: localStamp(start),
+      distanceM,
+      durationSec,
+      avgHr: r.km > 15 ? 168 : 174,
+      elevationGainM: r.km > 15 ? 64 : 22,
+      load: Math.round((durationSec / 60) * 2.6),
+      loadEstimated: false,
+      weather,
+      calories: activeCalories + Math.round((durationSec / 86400) * 1690),
+      activeCalories,
+      race: true,
+      ...demoDynamics(durationSec / (distanceM / 1000), durationSec, zones),
+    };
+  });
+  const raceDays = new Set(races.map((r) => r.startLocal.slice(0, 10)));
+  return [...runs.filter((r) => !raceDays.has(r.startLocal.slice(0, 10))), ...races].sort((a, b) => b.startLocal.localeCompare(a.startLocal));
+}
+
 function demoRuns(today: Date, rand: () => number): Run[] {
   const runs: Run[] = [];
   // A year plus load warm-up. Fitness improves towards today: older runs are
@@ -108,7 +157,7 @@ function demoRuns(today: Date, rand: () => number): Run[] {
       ...demoDynamics(pace, durationSec, t.zones),
     });
   }
-  return runs;
+  return withDemoRaces(runs, today);
 }
 
 export function getDemoDashboard(): Dashboard {

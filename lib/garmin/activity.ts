@@ -56,6 +56,7 @@ export async function getLiveActivity(id: string): Promise<ActivityDetail | null
     verticalRatioPct: num(s.verticalRatio),
     weather,
     ...runCalories(num(s.calories), num(s.bmrCalories)),
+    race: (summary.eventTypeDTO ?? summary.eventType)?.typeKey === "race",
   });
 
   const [details, laps] = await Promise.all([

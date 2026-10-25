@@ -3,6 +3,7 @@ import { after, connection } from "next/server";
 import { redirect } from "next/navigation";
 import { Dashboard, DashboardSkeleton } from "@/components/dashboard";
 import {
+  getGarminAllHistory,
   getGarminDashboard,
   getGarminExtras,
   getGarminInsightsData,
@@ -53,6 +54,9 @@ async function LiveDashboard({ searchParams }: { searchParams: PageProps<"/">["s
     warnings: [`insights: ${err instanceof Error ? err.message : "failed"}`],
   }));
 
+  // Past races look back over all stored history; without it, the insight window will do.
+  const historyP: Promise<InsightsData | null> = getGarminAllHistory().catch(() => null);
+
   let data: Data;
   try {
     data = await getGarminDashboard();
@@ -61,8 +65,17 @@ async function LiveDashboard({ searchParams }: { searchParams: PageProps<"/">["s
     redirect("/login?reason=expired");
   }
 
-  const [trends, extras, insights] = await Promise.all([trendsP, extrasP, insightsP]);
-  return <Dashboard data={data} trends={trends} extras={extras} insights={insights} settings={await getSettings("garmin")} />;
+  const [trends, extras, insights, history] = await Promise.all([trendsP, extrasP, insightsP, historyP]);
+  return (
+    <Dashboard
+      data={data}
+      trends={trends}
+      extras={extras}
+      insights={insights}
+      history={history ?? insights}
+      settings={await getSettings("garmin")}
+    />
+  );
 }
 
 export default function Home({ searchParams }: PageProps<"/">) {

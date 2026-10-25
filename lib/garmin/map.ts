@@ -43,5 +43,6 @@ export function mapRun(a: any): Run {
     groundContactMs: num(a.avgGroundContactTime),
     verticalRatioPct: num(a.avgVerticalRatio),
     ...runCalories(num(a.calories), num(a.bmrCalories)),
+    race: a.eventType?.typeKey === "race",
   });
 }

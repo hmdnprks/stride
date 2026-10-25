@@ -54,6 +54,10 @@ Each run's start conditions (temperature, feels-like, dew point, humidity, wind)
 
 Each day's calories (total, active and resting) come from Garmin's calorie report, and each run's from the activity list, so they cost almost no extra requests. On the Runs tab, **Burned off** shows this week's and this month's active calories as servings of a food you pick, drawn as that many pieces, and the running trends chart active calories per day or week, split into running and everything else. Only active calories count towards the food: resting calories are burned whether you run or not. The year in review counts the year in pizzas, and a week's story card counts its runs. Food values are rounded typical servings in `lib/energy.ts`.
 
+## Races
+
+The Goals tab keeps every race, not just the next one. Add as many as you like; the soonest gets the countdown and taper plan. After race day, Stride finds the run that was the race: one on that day you marked as a race in Garmin Connect, else the one closest to the race distance (you can pick a different run). For three weeks the race result takes the countdown's place: finish time against Garmin's prediction going in, pace, heart rate, and your weekly kilometres over the 8 weeks before. **Past races** lists them all, including runs marked as races in Garmin that you never added, with your best time at each distance marked. Race days get a ring on the training calendar and a Race tag on the run page.
+
 ## Share cards
 
 **Share run** on a run's page and **Share this week** under the weekly summary make an image in the watch-face style: the distance huge and condensed, then time, pace, heart rate and climb (or, for a week, a bar for each day). Pick **Story** (1080×1920) or **Square** (1080×1080), then **Share** opens the phone's share sheet, or **Download** saves the PNG. A run's story card can draw the route shape; that's off by default, since a route often starts at home.
@@ -107,6 +111,7 @@ lib/garmin/store.ts        Stored daily history: sync, backfill, store + live re
 lib/export.ts              CSV for runs and daily readings
 lib/review.ts              Year in review: monthly splits, highlights, body changes
 lib/energy.ts              Active calories this week and month, and food servings
+lib/races.ts               Races: goals matched to their runs, results, build-up, bests
 lib/card.tsx               Share card layouts (run, week; story, square)
 app/api/card/[kind]/[id]   Share card images
 components/share/          Share panel: preview, size, route, share or download
@@ -122,7 +127,7 @@ lib/garmin/map.ts          Connect activity → Run mapping
 lib/garmin/weather.ts      Per-run weather from Garmin (°F/mph → metric)
 lib/trends.ts              Date ranges, weekly bucketing, training load
 lib/insights.ts            Weekly summary, sleep vs performance, recovery check, goals, race plan
-lib/settings.ts            Goals and race, stored in .stride/settings.json
+lib/settings.ts            Distance goals and races, in the key-value store
 lib/garmin/demo.ts         Demo data
 lib/garmin/index.ts        getGarminDashboard(): cached live data
 lib/format.ts              Units, pace, durations, running totals

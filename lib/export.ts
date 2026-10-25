@@ -63,6 +63,7 @@ export function runsCsv(runs: Run[], { garmin }: { garmin: boolean }) {
     "Humidity (%)",
     "Calories (kcal)",
     "Active calories (kcal)",
+    "Race",
     "Garmin Connect link",
   ];
   const rows = [...runs]
@@ -89,6 +90,7 @@ export function runsCsv(runs: Run[], { garmin }: { garmin: boolean }) {
       r.weather?.humidityPct ?? null,
       r.calories ?? null,
       r.activeCalories ?? null,
+      r.race ? "Yes" : null,
       garmin ? `https://connect.garmin.com/modern/activity/${r.id}` : null,
     ]);
   return csv(header, rows);

@@ -6,7 +6,7 @@ import { refresh, updateTag } from "next/cache";
 import { disconnect, signIn, verifyMfa, type SignInResult } from "@/lib/garmin/auth";
 import { clearHistory, GARMIN_CACHE_TAG, type DataSource } from "@/lib/garmin";
 import { assertUnlocked } from "@/lib/gate-server";
-import { saveSettings } from "@/lib/settings";
+import { saveSettings, updateRaces } from "@/lib/settings";
 
 const MFA_COOKIE = "garmin_mfa";
 
@@ -87,7 +87,7 @@ export async function syncAction() {
   updateTag(GARMIN_CACHE_TAG);
 }
 
-/* ---------- Goals and race (stored locally in .stride/settings.json) ---------- */
+/* ---------- Goals and races ---------- */
 
 const sourceOf = (v: unknown): DataSource => (v === "garmin" ? "garmin" : "demo");
 
@@ -103,9 +103,11 @@ export type RaceFormState = { error?: string; saved?: boolean };
 
 const DISTANCES: Record<string, number> = { "5k": 5, "10k": 10, half: 21.0975, marathon: 42.195 };
 
+/** Add a race, or edit one when the form carries its id. */
 export async function saveRaceAction(_: RaceFormState, form: FormData): Promise<RaceFormState> {
   await assertUnlocked();
   const source = sourceOf(form.get("source"));
+  const id = String(form.get("id") ?? "");
   const name = String(form.get("name") ?? "").trim().slice(0, 80);
   const date = String(form.get("date") ?? "");
   const preset = String(form.get("distance") ?? "");
@@ -116,13 +118,26 @@ export async function saveRaceAction(_: RaceFormState, form: FormData): Promise<
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Pick the race date." };
   if (!Number.isFinite(distanceKm)) return { error: "Choose a distance, or enter one in km." };
 
-  await saveSettings(source, { race: { name, date, distanceKm } });
+  await updateRaces(source, (races) => {
+    const old = races.find((r) => r.id === id);
+    if (!old) return [...races, { id: crypto.randomUUID().slice(0, 8), name, date, distanceKm }];
+    // A new date means a different race-day run.
+    return races.map((r) => (r.id === id ? { ...r, name, date, distanceKm, runId: date === old.date ? old.runId : null } : r));
+  });
   refresh();
   return { saved: true };
 }
 
-export async function clearRaceAction(source: DataSource) {
+export async function removeRaceAction(source: DataSource, id: string) {
   await assertUnlocked();
-  await saveSettings(sourceOf(source), { race: null });
+  await updateRaces(sourceOf(source), (races) => races.filter((r) => r.id !== id));
+  refresh();
+}
+
+/** Say which run was the race; null goes back to matching it by date and distance. */
+export async function pickRaceRunAction(source: DataSource, id: string, runId: string | null) {
+  await assertUnlocked();
+  const run = runId && /^[\w-]{1,40}$/.test(runId) ? runId : null;
+  await updateRaces(sourceOf(source), (races) => races.map((r) => (r.id === id ? { ...r, runId: run } : r)));
   refresh();
 }

@@ -114,7 +114,10 @@ export function ActivityView({ detail, backHref }: { detail: ActivityDetail; bac
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-14 px-4 py-10 sm:px-8">
         <header className="flex flex-col gap-3">
-          <p className="text-base text-muted-foreground">{when}</p>
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-muted-foreground">
+            {when}
+            {run.race && <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground">Race</span>}
+          </p>
           <h1 className="wide text-2xl leading-[1.05] font-bold sm:text-3xl">{run.name}</h1>
           <ShareCard
             src={`/api/card/run/${run.id}${backHref.startsWith("/demo") ? "?source=demo" : ""}`}

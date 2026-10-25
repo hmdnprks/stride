@@ -2,17 +2,21 @@ import "server-only";
 
 import fs from "node:fs";
 import path from "node:path";
-import type { DataSource, StrideSettings } from "./garmin/types";
+import type { DataSource, RaceGoal, StrideSettings } from "./garmin/types";
+import { DEMO_RACES } from "./garmin/demo";
 import { kvGet, kvSet } from "./kv";
 
-// Goals and the target race, stored in the key-value store (a JSON file in
+// Goals and races, stored in the key-value store (a JSON file in
 // .stride/ during local development). Demo and live data keep separate settings.
 
-const EMPTY: StrideSettings = { monthKm: null, yearKm: null, race: null };
+const EMPTY: StrideSettings = { monthKm: null, yearKm: null, races: [] };
+
+/** As saved: earlier versions kept a single `race` instead of the list. */
+type Saved = Partial<StrideSettings> & { race?: Omit<RaceGoal, "id"> | null };
 /** Where earlier local versions kept settings; read so local goals carry over. */
 const LEGACY_FILE = path.join(process.cwd(), ".stride", "settings.json");
 
-function legacy(source: DataSource): Partial<StrideSettings> | null {
+function legacy(source: DataSource): Saved | null {
   try {
     return JSON.parse(fs.readFileSync(LEGACY_FILE, "utf8"))[source] ?? null;
   } catch {
@@ -21,23 +25,41 @@ function legacy(source: DataSource): Partial<StrideSettings> | null {
 }
 const key = (source: DataSource) => `settings:${source}`;
 
-/** Sample goals so the demo shows every state out of the box. */
+/** Sample goals so the demo shows every state out of the box: a race coming up and one run. */
 function demoDefaults(): StrideSettings {
   const race = new Date();
   race.setDate(race.getDate() + 26);
   const date = `${race.getFullYear()}-${String(race.getMonth() + 1).padStart(2, "0")}-${String(race.getDate()).padStart(2, "0")}`;
-  return { monthKm: 200, yearKm: 2400, race: { name: "City Half Marathon", date, distanceKm: 21.0975 } };
+  const past = DEMO_RACES().find((r) => r.goal)!;
+  return {
+    monthKm: 200,
+    yearKm: 2400,
+    races: [
+      { id: "demo-next", name: "City Half Marathon", date, distanceKm: 21.0975 },
+      { id: "demo-past", name: past.name, date: past.date, distanceKm: past.km },
+    ],
+  };
+}
+
+/** The saved settings, with an old single race moved into the list. */
+async function readSaved(source: DataSource): Promise<Partial<StrideSettings>> {
+  const { race, ...saved } = (await kvGet<Saved>(key(source))) ?? legacy(source) ?? {};
+  if (race && !saved.races) saved.races = [{ id: `race-${race.date}`, ...race }];
+  return saved;
 }
 
 export async function getSettings(source: DataSource): Promise<StrideSettings> {
-  const saved = (await kvGet<Partial<StrideSettings>>(key(source))) ?? legacy(source);
-  const base = source === "demo" ? demoDefaults() : EMPTY;
-  return saved ? { ...base, ...saved } : base;
+  const saved = await readSaved(source);
+  return { ...(source === "demo" ? demoDefaults() : EMPTY), ...saved };
 }
 
 /** Stores only what the runner changed, so demo defaults (like a race date
  * relative to today) aren't frozen in by an unrelated edit. */
 export async function saveSettings(source: DataSource, patch: Partial<StrideSettings>) {
-  const saved = (await kvGet<Partial<StrideSettings>>(key(source))) ?? legacy(source) ?? {};
-  await kvSet(key(source), { ...saved, ...patch });
+  await kvSet(key(source), { ...(await readSaved(source)), ...patch });
+}
+
+/** Change the race list; `change` gets the current list (demo defaults included). */
+export async function updateRaces(source: DataSource, change: (races: RaceGoal[]) => RaceGoal[]) {
+  await saveSettings(source, { races: change((await getSettings(source)).races) });
 }

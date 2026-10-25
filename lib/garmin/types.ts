@@ -90,6 +90,8 @@ export interface Run {
   /** Garmin's calorie estimate for the run, kcal: all of it, and the part above resting (BMR). Absent on runs stored before calories were kept. */
   calories?: number | null;
   activeCalories?: number | null;
+  /** Marked as a race in Garmin Connect. Absent on runs stored before it was kept. */
+  race?: boolean;
 }
 
 export interface Dashboard {
@@ -236,6 +238,8 @@ export interface CalendarDay {
   date: string;
   km: number;
   runs: number;
+  /** A run that day was a race. */
+  race?: boolean;
 }
 
 /** Heart-rate zone boundaries as set on the watch / in Garmin Connect. */
@@ -297,15 +301,19 @@ export interface InsightsData {
 }
 
 export interface RaceGoal {
+  id: string;
   name: string;
   /** YYYY-MM-DD */
   date: string;
   distanceKm: number;
+  /** The run that was this race, when picked by hand; otherwise it's matched by date and distance. */
+  runId?: string | null;
 }
 
 /** Things the runner sets in Stride itself. */
 export interface StrideSettings {
   monthKm: number | null;
   yearKm: number | null;
-  race: RaceGoal | null;
+  /** Every race set in Stride, past and upcoming. */
+  races: RaceGoal[];
 }
