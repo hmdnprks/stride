@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import useMeasure from "react-use-measure";
 import { barPath, bucketLabel, linear, linePath, niceTicks, shortDay, timeTicks } from "./scale";
 import { useTrendsPending } from "./pending";
+import { InfoTip } from "../info-tip";
 
 type Num = number | null;
 /** Any record with a bucket start; layers read numeric fields by key. */
@@ -56,6 +57,7 @@ function Swatch({ color, mark }: { color: string; mark: "line" | "rect" | "wash"
 
 export function TrendChart({
   title,
+  info,
   summary,
   rows,
   bucket,
@@ -67,6 +69,8 @@ export function TrendChart({
   hideLegend = false,
 }: {
   title: string;
+  /** What the measure means, in a tooltip by the title. */
+  info?: string;
   summary?: ReactNode;
   rows: Row[];
   bucket: "day" | "week";
@@ -156,7 +160,10 @@ export function TrendChart({
   return (
     <figure className="flex min-w-0 flex-col gap-3">
       <figcaption className="flex flex-col gap-1">
-        <h3 className="text-base font-semibold">{title}</h3>
+        <h3 className="flex items-center gap-1.5 text-base font-semibold">
+          {title}
+          {info && <InfoTip label={title}>{info}</InfoTip>}
+        </h3>
         {summary && <p className="text-sm text-muted-foreground">{summary}</p>}
         {series.length > 1 && !hideLegend && (
           <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">

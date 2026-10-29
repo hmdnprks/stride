@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { HrZoneSettings, TrendPoint, Trends } from "@/lib/garmin/types";
+import { HRV_INFO } from "@/lib/glossary";
 import { RANGE_LABELS } from "@/lib/trends";
 import { PaceHrChart } from "../charts/pace-hr-chart";
 import { TrendChart } from "../charts/trend-chart";
@@ -137,6 +138,7 @@ export function RecoveryTrends({ trends }: { trends: Trends }) {
         />
         <TrendChart
           title="Overnight HRV"
+          info={HRV_INFO}
           summary={hrv !== null ? `Averaging ${Math.round(hrv)} ms. Inside the shaded band is your normal, balanced range.` : undefined}
           rows={p}
           bucket={trends.bucket}

@@ -47,7 +47,7 @@ export function Dashboard({
       live={data.source === "garmin"}
       range={trends.range}
       views={{
-        today: <TodayView data={data} trends={trends} recovery={recovery} week={week} />,
+        today: <TodayView data={data} trends={trends} recovery={recovery} week={week} energy={energy.today} />,
         fitness: <FitnessView data={data} trends={trends} sleepPerf={sleepPerf} heatPerf={heatPerf} />,
         runs: <RunsView data={data} trends={trends} extras={runningExtras} energy={energy} />,
         goals: (

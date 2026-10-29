@@ -52,13 +52,26 @@ function period(from: string, to: string, daily: DailyRaw[], runs: Run[]): Energ
   return { from, to, active: total, running: total === null || running === null ? null : Math.min(running, total), runs: inPeriod.length };
 }
 
-/** This week (from Monday) and this month (from the 1st), up to today. */
+/** Average active calories on the 28 days before today that have calorie data, kcal. */
+function usualDay(daily: DailyRaw[], today: string) {
+  const from = addDays(today, -28);
+  const days = daily.filter((d) => d.date >= from && d.date < today && typeof d.kcalActive === "number");
+  return days.length >= 7 ? Math.round(days.reduce((a, d) => a + d.kcalActive!, 0) / days.length) : null;
+}
+
+/** Today so far, this week (from Monday) and this month (from the 1st), up to today. */
 export function energyBurned(daily: DailyRaw[], runs: Run[], today: string) {
   return {
+    today: { ...period(today, today, daily, runs), usual: usualDay(daily, today) },
     week: period(mondayOf(today), today, daily, runs),
     month: period(`${today.slice(0, 7)}-01`, today, daily, runs),
     lastWeek: period(addDays(mondayOf(today), -7), addDays(mondayOf(today), -1), daily, runs),
   };
+}
+
+/** The biggest food that makes at least one serving, for "about 2 doughnuts". */
+export function closestFood(kcal: number) {
+  return [...FOODS].sort((a, b) => b.kcal - a.kcal).find((f) => servings(kcal, f) >= 1) ?? null;
 }
 
 /** How many servings of `food` some calories are worth, to the nearest quarter. */

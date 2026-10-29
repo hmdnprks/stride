@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Dashboard, Run, RunningExtras, Sleep, Trends } from "@/lib/garmin";
 import type { heatPerformance, recoveryCheck, sleepPerformance, weeklySummary } from "@/lib/insights";
-import type { energyBurned } from "@/lib/energy";
+import { closestFood, servings, servingsLabel, type energyBurned } from "@/lib/energy";
+import { HRV_INFO } from "@/lib/glossary";
 import { clock, hm, km, pace, paceOf, runningTotals, shortDate } from "@/lib/format";
 import { CalendarHeatmap } from "../charts/calendar-heatmap";
 import { Sparkline } from "../charts/sparkline";
@@ -75,14 +76,36 @@ function BatteryRange({ low, high, current }: { low: number; high: number; curre
   );
 }
 
+/** What each stage is, in plain words, and its usual share of time asleep (adults, rough). */
+const STAGE_INFO = {
+  Deep: {
+    what: "The repair stage. Heart rate and breathing slow right down and you're hardest to wake. Muscles get repaired and growth hormone is released, so it matters most for recovering from runs. Most of it comes early in the night.",
+    usual: [13, 23],
+  },
+  Light: {
+    what: "The in-between stage, as you drift off and move between the others. You're easy to wake, but it still rests the body and helps memory. It's normally the biggest part of the night.",
+    usual: [45, 60],
+  },
+  REM: {
+    what: "The dreaming stage. The brain is nearly as active as when awake while the body stays still. It sorts memories, skills and emotions. Most of it comes late in the night, so a short night cuts it first.",
+    usual: [20, 25],
+  },
+  Awake: {
+    what: "Brief wake-ups: turning over, a noise, the toilet. You usually don't remember them. Up to about half an hour is normal.",
+    usual: null,
+  },
+} as const;
+
 function SleepStages({ sleep }: { sleep: Sleep }) {
   const stages = [
     { label: "Deep", sec: sleep.deepSec, color: "bg-stage-deep" },
     { label: "Light", sec: sleep.lightSec, color: "bg-stage-light" },
     { label: "REM", sec: sleep.remSec, color: "bg-stage-rem" },
     { label: "Awake", sec: sleep.awakeSec, color: "bg-stage-awake" },
-  ];
+  ] as const;
   const total = stages.reduce((a, s) => a + s.sec, 0) || 1;
+  // Shares of time asleep, so a restless night doesn't shrink every stage.
+  const asleep = sleep.deepSec + sleep.lightSec + sleep.remSec || 1;
   return (
     <div className="flex flex-col gap-4">
       <div className="flex h-3 gap-0.5 overflow-hidden rounded-full">
@@ -101,6 +124,94 @@ function SleepStages({ sleep }: { sleep: Sleep }) {
           </div>
         ))}
       </dl>
+
+      <details className="group text-sm">
+        <summary className="w-fit cursor-pointer text-muted-foreground select-none hover:text-foreground">
+          <span className="group-open:hidden">What do these mean?</span>
+          <span className="hidden group-open:inline">Hide</span>
+        </summary>
+        <div className="mt-3 flex flex-col gap-4">
+          <p className="text-muted-foreground">
+            Sleep runs in cycles of about 90 minutes, four or five a night, each passing through these stages.
+          </p>
+          <ul className="flex flex-col gap-4">
+            {stages.map((s) => {
+              const info = STAGE_INFO[s.label];
+              const share = Math.round((s.sec / asleep) * 100);
+              const where = !info.usual ? null : share < info.usual[0] ? "below" : share > info.usual[1] ? "above" : "within";
+              return (
+                <li key={s.label} className="flex gap-3">
+                  <span className={`mt-1.5 size-2.5 shrink-0 rounded-full ${s.color}`} aria-hidden />
+                  <div className="flex flex-col gap-1">
+                    <p>
+                      <span className="font-semibold">{s.label}</span>
+                      <span className="text-muted-foreground">
+                        {info.usual
+                          ? `: ${share}% of your sleep last night, ${where} the usual ${info.usual[0]}–${info.usual[1]}%.`
+                          : `: ${hm(s.sec)} last night.`}
+                      </span>
+                    </p>
+                    <p className="max-w-[60ch] text-muted-foreground">{info.what}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="max-w-[60ch] text-muted-foreground">
+            Your watch estimates stages from heart rate, heart-rate variability and movement, not brain waves as a sleep lab would, so read
+            one night loosely. The trend over weeks says more. Late runs, alcohol, a warm room and short nights tend to lower deep sleep.
+          </p>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+const kcal = (n: number) => n.toLocaleString("en-GB");
+
+/** Active calories burned so far today: from runs and from everything else. */
+function ActiveToday({ energy }: { energy: ReturnType<typeof energyBurned>["today"] }) {
+  const { active, running, runs, usual } = energy;
+  if (active === null) return <p className="text-sm text-muted-foreground">No calories for today yet. Sync your watch and they&apos;ll appear.</p>;
+  const fromRuns = running ?? 0;
+  const other = active - fromRuns;
+  const food = closestFood(active);
+  const parts = [
+    { label: runs ? `Running (${runs} ${runs === 1 ? "run" : "runs"})` : "Running", kcal: fromRuns, color: "bg-primary" },
+    { label: "Everything else", kcal: other, color: "bg-series/45" },
+  ];
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="flex items-baseline gap-2">
+        <span className="num text-[4.5rem] leading-none font-bold sm:text-[5.5rem]">{kcal(active)}</span>
+        <span className="text-lg font-semibold">kcal</span>
+        <span className="text-sm text-muted-foreground">so far</span>
+      </p>
+      {active > 0 && (
+        <div className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-lane">
+          {parts.map((p) => p.kcal > 0 && <div key={p.label} className={p.color} style={{ width: `${(p.kcal / Math.max(active, usual ?? 0)) * 100}%` }} />)}
+        </div>
+      )}
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-2">
+        {parts.map((p) => (
+          <div key={p.label} className="flex flex-col gap-1">
+            <dt className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className={`size-2.5 rounded-full ${p.color}`} />
+              {p.label}
+            </dt>
+            <dd className="text-base font-semibold tabular-nums">{kcal(p.kcal)} kcal</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="text-sm text-muted-foreground">
+        {food ? `About ${servingsLabel(servings(active, food), food)}. ` : ""}
+        {usual !== null
+          ? active < usual
+            ? `The bar runs to your usual full day, about ${kcal(usual)} kcal. `
+            : `Already past your usual full day of about ${kcal(usual)} kcal. `
+          : ""}
+        Active calories only: what you burned above resting.
+      </p>
     </div>
   );
 }
@@ -110,11 +221,13 @@ export function TodayView({
   trends,
   recovery,
   week,
+  energy,
 }: {
   data: Dashboard;
   trends: Trends;
   recovery: ReturnType<typeof recoveryCheck>;
   week: ReturnType<typeof weeklySummary>;
+  energy: ReturnType<typeof energyBurned>["today"];
 }) {
   const recent = (key: keyof Trends["points"][number]) =>
     trends.points.slice(-14).map((p) => (typeof p[key] === "number" ? (p[key] as number) : null));
@@ -157,6 +270,7 @@ export function TodayView({
             },
             {
               label: "Overnight HRV",
+              info: HRV_INFO,
               value: heart?.hrvLastNight ?? null,
               unit: "ms",
               note:
@@ -198,6 +312,11 @@ export function TodayView({
         <section className="flex flex-col gap-6">
           <Heading>Last night&apos;s sleep</Heading>
           {sleep ? <SleepStages sleep={sleep} /> : <Missing what="sleep data" />}
+        </section>
+
+        <section className="flex flex-col gap-6">
+          <Heading>Active calories today</Heading>
+          <ActiveToday energy={energy} />
         </section>
       </div>
 

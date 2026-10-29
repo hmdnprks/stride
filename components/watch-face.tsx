@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Sparkline } from "./charts/sparkline";
 import { StatNumber } from "./stat-number";
+import { InfoTip } from "./info-tip";
 
 export interface WatchField {
   label: string;
@@ -11,6 +12,8 @@ export interface WatchField {
   note?: ReactNode;
   /** Recent values for a sparkline. */
   trend?: (number | null)[];
+  /** What the figure means, in a tooltip by the label. */
+  info?: string;
 }
 
 /**
@@ -29,7 +32,10 @@ export function WatchFace({ fields }: { fields: [WatchField, WatchField, WatchFi
             i > 1 ? "border-t border-panel-line" : "",
           ].join(" ")}
         >
-          <span className="text-sm font-medium text-panel-muted sm:text-base">{f.label}</span>
+          <span className="flex items-center gap-1.5 text-sm font-medium text-panel-muted sm:text-base">
+            {f.label}
+            {f.info && <InfoTip label={f.label}>{f.info}</InfoTip>}
+          </span>
           <span className="flex items-baseline gap-2">
             <StatNumber
               value={f.value}
