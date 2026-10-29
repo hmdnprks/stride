@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { Run } from "@/lib/garmin/types";
 import type { BodyChange, MonthSplit, YearReview } from "@/lib/review";
 import { FOODS } from "@/lib/energy";
-import { hm, km, pace, paceOf } from "@/lib/format";
+import { clock, hm, km, pace, paceOf } from "@/lib/format";
+import { distanceLabel, distanceName, type FinishedRace } from "@/lib/races";
 import { Sparkline } from "../charts/sparkline";
 import { StatNumber } from "../stat-number";
 import { PersonalRecords } from "../dashboard/records";
@@ -186,6 +187,55 @@ function Highlights({ review, runHref }: { review: YearReview; runHref: (id: str
   );
 }
 
+/** The year's races in order, like a season's results. */
+function SeasonRaces({ races, runHref }: { races: FinishedRace[]; runHref: (id: string) => string }) {
+  return (
+    <ol className="border-t-2 border-foreground">
+      {races.map((r) => (
+        <li
+          key={r.key}
+          className="grid grid-cols-[1fr_auto] items-baseline gap-x-6 gap-y-1 border-b border-border py-4 md:grid-cols-[7rem_1fr_9rem_7rem]"
+        >
+          <span className="order-2 text-sm text-muted-foreground tabular-nums md:order-none">{dayMonth(r.date)}</span>
+          <span className="order-1 flex flex-wrap items-baseline gap-x-2 md:order-none">
+            {r.run ? (
+              <Link href={`${runHref(r.run.id)}`} className="font-semibold underline-offset-4 hover:underline">
+                {r.name}
+              </Link>
+            ) : (
+              <span className="font-semibold">{r.name}</span>
+            )}
+            <span className="text-sm text-muted-foreground">{distanceLabel(r.distanceKm)}</span>
+            {r.best && <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">Best</span>}
+          </span>
+          <span className="order-1 text-right md:order-none">
+            {r.run ? <span className="num text-[2.375rem] font-semibold">{clock(r.run.durationSec)}</span> : <span className="text-sm text-muted-foreground">No run found</span>}
+          </span>
+          <span className="order-2 text-right text-sm font-semibold text-primary tabular-nums md:order-none md:text-base">
+            {r.run ? `${pace(r.run.paceSecPerKm)} /km` : ""}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** "3 races: two 10Ks and a half marathon." */
+function seasonSummary(races: FinishedRace[]) {
+  const counts = new Map<string, number>();
+  for (const r of races) {
+    const name = distanceName(r.distanceKm);
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  const words = ["no", "a", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+  const parts = [...counts].map(([name, n]) => {
+    const label = name.endsWith(" km") ? `${name} race` : name.replace("Half", "half").replace("Marathon", "marathon");
+    return `${words[n] ?? n} ${label}${n > 1 ? "s" : ""}`;
+  });
+  const list = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0];
+  return `${races.length} ${races.length === 1 ? "race" : "races"}: ${list}.${races.some((r) => r.best) ? " Best is your fastest time at that distance." : ""}`;
+}
+
 function consistency(active: number, total: number) {
   const share = total ? active / total : 0;
   if (share >= 0.9) return "Barely a week missed.";
@@ -245,10 +295,13 @@ export function YearReviewView({
   years,
   warnings,
   base,
+  races = [],
 }: {
   review: YearReview;
   years: number[];
   warnings: string[];
+  /** This year's finished races, oldest first. */
+  races?: FinishedRace[];
   /** "" for live data, "/demo" for the demo. */
   base: "" | "/demo";
 }) {
@@ -304,6 +357,12 @@ export function YearReviewView({
               <Highlights review={review} runHref={runHref} />
             </Section>
           </>
+        )}
+
+        {races.length > 0 && (
+          <Section title={`Races in ${review.year}`} intro={seasonSummary(races)}>
+            <SeasonRaces races={races} runHref={runHref} />
+          </Section>
         )}
 
         <Section title={`Records set in ${review.year}`} intro="Garmin keeps your best effort at each distance; these are the ones you set this year that still stand.">

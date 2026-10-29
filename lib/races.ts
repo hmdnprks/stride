@@ -1,8 +1,9 @@
 import type { DailyRaw, RaceGoal, Run } from "./garmin/types";
+import { clock } from "./format";
 import { addDays, isoDate } from "./trends";
 
-// Races: the ones set as goals in Stride and the runs marked as races in
-// Garmin Connect, joined up. A goal finds its run by date and distance (or by
+// Races: the ones set as goals in Stride and the runs marked as races (in
+// Garmin Connect, or in Stride over Garmin's mark), joined up. A goal finds its run by date and distance (or by
 // hand), and each finished race gets its result and how training went before it.
 
 export const RACE_DISTANCES = [
@@ -61,6 +62,20 @@ export function standardDistance(km: number) {
 
 export const distanceLabel = (km: number) => standardDistance(km)?.label ?? `${round1(km)} km`;
 
+/** "Half marathon", "10K", or "15 km". */
+export const distanceName = (km: number) => (standardDistance(km)?.label === "Half" ? "Half marathon" : distanceLabel(km));
+
+/** "3:12 faster than Garmin predicted", or null when there's nothing fair to compare. */
+export function versusPrediction(race: FinishedRace) {
+  if (!race.run || !race.predictedSec) return null;
+  // A run well off the race distance (picked by hand) isn't comparable.
+  if (Math.abs(race.run.distanceKm - race.distanceKm) / race.distanceKm > 0.1) return null;
+  const diff = race.run.durationSec - race.predictedSec;
+  if (Math.abs(diff) < 5) return "Right on Garmin's prediction";
+  return `${clock(Math.abs(diff))} ${diff < 0 ? "faster" : "slower"} than Garmin predicted`;
+}
+
+
 const candidate = (r: Run): RaceCandidate => ({
   id: r.id,
   name: r.name,
@@ -74,12 +89,12 @@ const candidate = (r: Run): RaceCandidate => ({
  * that Garmin marks as a race, else the one closest to the race distance
  * (within 15%, so a warm-up jog isn't taken for a half).
  */
-function matchRun(goal: RaceGoal, runs: Run[]) {
+function matchRun(goal: RaceGoal, runs: Run[], notRace: Set<string>) {
   if (goal.runId) {
     const picked = runs.find((r) => r.id === goal.runId);
     if (picked) return { run: picked, picked: true };
   }
-  const onDay = runs.filter((r) => dateOf(r) === goal.date);
+  const onDay = runs.filter((r) => dateOf(r) === goal.date && !notRace.has(r.id));
   const near = (r: Run) => Math.abs(r.distanceM / 1000 - goal.distanceKm) / goal.distanceKm;
   const marked = onDay.filter((r) => r.race).sort((a, b) => near(a) - near(b))[0];
   const closest = onDay.filter((r) => near(r) <= 0.15).sort((a, b) => near(a) - near(b))[0];
@@ -105,11 +120,18 @@ function weeklyKm(date: string, runs: Run[]) {
   });
 }
 
+/** Runs with Stride's race marks applied over Garmin's. */
+export function applyRaceMarks(runs: Run[], marks: Record<string, boolean>) {
+  return runs.map((r) => (r.id in marks ? { ...r, race: marks[r.id] } : r));
+}
+
 /**
  * Upcoming and finished races. `runs` and `daily` should reach back
  * BUILD_WEEKS before the oldest race for its build-up and prediction.
  */
-export function buildRaces(goals: RaceGoal[], runs: Run[], daily: DailyRaw[], today = isoDate(new Date())): Races {
+export function buildRaces(goals: RaceGoal[], allRuns: Run[], daily: DailyRaw[], today = isoDate(new Date()), marks: Record<string, boolean> = {}): Races {
+  const runs = applyRaceMarks(allRuns, marks);
+  const notRace = new Set(Object.keys(marks).filter((id) => !marks[id]));
   const byDate = new Map(daily.map((d) => [d.date, d]));
   const past: FinishedRace[] = [];
   const upcoming: RaceGoal[] = [];
@@ -130,7 +152,7 @@ export function buildRaces(goals: RaceGoal[], runs: Run[], daily: DailyRaw[], to
   });
 
   for (const goal of goals) {
-    const { run, picked } = goal.date <= today ? matchRun(goal, runs) : { run: null, picked: false };
+    const { run, picked } = goal.date <= today ? matchRun(goal, runs, notRace) : { run: null, picked: false };
     // On race day the goal stays a countdown until its run shows up.
     if (goal.date > today || (goal.date === today && !run)) {
       upcoming.push(goal);

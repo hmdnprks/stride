@@ -6,12 +6,12 @@ import { removeRaceAction, saveGoalAction, saveRaceAction, type RaceFormState } 
 import type { DataSource, RaceGoal } from "@/lib/garmin/types";
 import type { GoalProgress, racePlan } from "@/lib/insights";
 import { clock, pace } from "@/lib/format";
-import type { FinishedRace } from "@/lib/races";
 import { addDays, isoDate } from "@/lib/trends";
 import { cn } from "@/lib/utils";
 import { InlineEdit } from "../uselayouts/inline-edit";
 import { StatusButton } from "../uselayouts/save-button";
-import { BuildUp, RunPicker, runHref, versusPrediction } from "./races";
+import { versusPrediction, type FinishedRace } from "@/lib/races";
+import { BuildUp, RunPicker, runHref } from "./races";
 
 type Plan = ReturnType<typeof racePlan>;
 
@@ -226,9 +226,14 @@ function RaceResult({ source, race }: { source: DataSource; race: FinishedRace }
       <div className="flex flex-wrap items-end justify-between gap-4">
         <RunPicker source={source} race={race} tone="panel" />
         {race.run && (
-          <Link href={runHref(source, race.run.id)} className={`${panelButton} inline-flex items-center`}>
-            View the run
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href={`${runHref(source, race.run.id)}#race-card`} className="inline-flex h-10 items-center rounded-full bg-panel-foreground px-4 text-sm font-semibold text-panel hover:bg-panel-foreground/90">
+              Make a race card
+            </Link>
+            <Link href={runHref(source, race.run.id)} className={`${panelButton} inline-flex items-center`}>
+              View the run
+            </Link>
+          </div>
         )}
       </div>
     </section>

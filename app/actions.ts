@@ -6,7 +6,7 @@ import { refresh, updateTag } from "next/cache";
 import { disconnect, signIn, verifyMfa, type SignInResult } from "@/lib/garmin/auth";
 import { clearHistory, GARMIN_CACHE_TAG, type DataSource } from "@/lib/garmin";
 import { assertUnlocked } from "@/lib/gate-server";
-import { saveSettings, updateRaces } from "@/lib/settings";
+import { markRace, saveSettings, updateRaces } from "@/lib/settings";
 
 const MFA_COOKIE = "garmin_mfa";
 
@@ -139,5 +139,15 @@ export async function pickRaceRunAction(source: DataSource, id: string, runId: s
   await assertUnlocked();
   const run = runId && /^[\w-]{1,40}$/.test(runId) ? runId : null;
   await updateRaces(sourceOf(source), (races) => races.map((r) => (r.id === id ? { ...r, runId: run } : r)));
+  // Picking a run makes it the race, even one marked "not a race" before.
+  if (run) await markRace(sourceOf(source), run, null);
+  refresh();
+}
+
+/** Count a run as a race or not, whatever Garmin says; null goes back to Garmin's mark. */
+export async function markRaceAction(source: DataSource, runId: string, race: boolean | null) {
+  await assertUnlocked();
+  if (!/^[\w-]{1,40}$/.test(runId)) return;
+  await markRace(sourceOf(source), runId, typeof race === "boolean" ? race : null);
   refresh();
 }

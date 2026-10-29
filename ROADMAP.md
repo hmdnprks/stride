@@ -108,10 +108,13 @@ Notes:
 - [x] Race result in place of the countdown for three weeks: finish time against Garmin's prediction the week before, pace, heart rate, watch distance, and weekly km over the 8 weeks before
 - [x] Past races: every goal race plus runs marked as races in Garmin, with the best time at each distance marked
 - [x] Race days ringed on the training calendar; Race tag on the run page; Race column in the runs CSV
-- [ ] Race share card
-- [ ] Races in the year in review
+- [x] Race / not-a-race switch on every run page, saved in Stride over Garmin's mark (so it works for runs older than the 7-day re-fetch); "Not a race" in Past races for Garmin-only races
+- [x] Race card: the result with the runner's own medal (cut out of its background in the browser) and bib photo, the route, and their name; story or square, share or download
+- [x] Races in the year in review, in order, with bests
 
 Notes:
 
 - A goal race on today's date stays a countdown until its run shows up.
 - The prediction comparison only shows when the run is within 10% of the race distance, so a hand-picked warm-up isn't compared with a half-marathon prediction.
+- The race card is drawn on a canvas in the browser, so photos are never uploaded or stored. The cut-out uses `@imgly/background-removal` (AGPL-3.0) with its smallest model, about 40 MB, downloaded from IMG.LY's CDN the first time and cached by the browser; only the model comes from there, the photo stays on the device. Fine for a personal app; selling Stride would need a commercial licence or another model.
+- The route is on by default on the race card (unlike the run card): races start at a race venue, not at home.

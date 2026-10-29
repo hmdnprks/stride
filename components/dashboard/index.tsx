@@ -34,7 +34,10 @@ export function Dashboard({
   const energy = energyBurned(daily, runs, today);
   const goals = goalProgress(extras.calendar, settings, today);
   const last28Km = runs.filter((r) => r.startLocal.slice(0, 10) > addDays(today, -28)).reduce((a, r) => a + r.distanceM, 0) / 1000;
-  const races = buildRaces(settings.races, history.runs, history.daily, today);
+  const races = buildRaces(settings.races, history.runs, history.daily, today, settings.raceMarks);
+  // Ring every race day on the calendar, Stride's marks and matched goals included.
+  const raceDays = new Set(races.past.flatMap((r) => (r.run ? [r.run.startLocal.slice(0, 10)] : [])));
+  const runningExtras = { ...extras, calendar: extras.calendar.map((d) => ({ ...d, race: raceDays.has(d.date) })) };
   const next = races.upcoming[0] ?? null;
   const plan = next ? racePlan(next, last28Km / 4, data.racePredictions, today) : null;
   const synced = new Date(data.fetchedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
@@ -46,7 +49,7 @@ export function Dashboard({
       views={{
         today: <TodayView data={data} trends={trends} recovery={recovery} week={week} />,
         fitness: <FitnessView data={data} trends={trends} sleepPerf={sleepPerf} heatPerf={heatPerf} />,
-        runs: <RunsView data={data} trends={trends} extras={extras} energy={energy} />,
+        runs: <RunsView data={data} trends={trends} extras={runningExtras} energy={energy} />,
         goals: (
           <div className="flex flex-col gap-16">
             <RaceCountdown source={data.source} race={next} plan={plan} latest={races.past[0] ?? null} later={races.upcoming.slice(1)} />

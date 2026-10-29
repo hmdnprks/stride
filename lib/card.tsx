@@ -13,7 +13,7 @@ import { addDays } from "./trends";
 // Shareable images of a run or a week, drawn as the watch-face panel: track
 // blue, white figures, thin lines between fields. Rendered with ImageResponse
 // (Satori), which only does flexbox and static fonts, so Archivo is bundled as
-// fixed instances in assets/fonts rather than the variable font the site uses.
+// fixed instances in public/fonts (also used by the race card, drawn in the browser).
 
 export const CARD_FORMATS = {
   story: { width: 1080, height: 1920, label: "Story" },
@@ -26,7 +26,7 @@ const WHITE = "#ffffff";
 const MUTED = "#b9c7ff";
 const LINE = "rgba(255,255,255,0.22)";
 
-const FONT_DIR = path.join(process.cwd(), "assets", "fonts");
+const FONT_DIR = path.join(process.cwd(), "public", "fonts");
 let fonts: Promise<{ name: string; data: Buffer; weight: 300 | 500 | 600 | 700; style: "normal" }[]> | null = null;
 
 /** Archivo instances: condensed for figures, wide for names, regular for labels. */

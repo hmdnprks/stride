@@ -9,7 +9,7 @@ import { kvGet, kvSet } from "./kv";
 // Goals and races, stored in the key-value store (a JSON file in
 // .stride/ during local development). Demo and live data keep separate settings.
 
-const EMPTY: StrideSettings = { monthKm: null, yearKm: null, races: [] };
+const EMPTY: StrideSettings = { monthKm: null, yearKm: null, races: [], raceMarks: {} };
 
 /** As saved: earlier versions kept a single `race` instead of the list. */
 type Saved = Partial<StrideSettings> & { race?: Omit<RaceGoal, "id"> | null };
@@ -38,6 +38,7 @@ function demoDefaults(): StrideSettings {
       { id: "demo-next", name: "City Half Marathon", date, distanceKm: 21.0975 },
       { id: "demo-past", name: past.name, date: past.date, distanceKm: past.km },
     ],
+    raceMarks: {},
   };
 }
 
@@ -57,6 +58,17 @@ export async function getSettings(source: DataSource): Promise<StrideSettings> {
  * relative to today) aren't frozen in by an unrelated edit. */
 export async function saveSettings(source: DataSource, patch: Partial<StrideSettings>) {
   await kvSet(key(source), { ...(await readSaved(source)), ...patch });
+}
+
+/** Mark a run as a race (true), not a race (false), or back to Garmin's mark (null). */
+export async function markRace(source: DataSource, runId: string, race: boolean | null) {
+  const { races, raceMarks } = await getSettings(source);
+  const marks = { ...raceMarks };
+  if (race === null) delete marks[runId];
+  else marks[runId] = race;
+  // A race picked for a goal by hand stops being its run once it's "not a race".
+  const unpicked = race === false && races.some((r) => r.runId === runId);
+  await saveSettings(source, { raceMarks: marks, ...(unpicked && { races: races.map((r) => (r.runId === runId ? { ...r, runId: null } : r)) }) });
 }
 
 /** Change the race list; `change` gets the current list (demo defaults included). */

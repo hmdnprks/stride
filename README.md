@@ -58,11 +58,15 @@ Each day's calories (total, active and resting) come from Garmin's calorie repor
 
 The Goals tab keeps every race, not just the next one. Add as many as you like; the soonest gets the countdown and taper plan. After race day, Stride finds the run that was the race: one on that day you marked as a race in Garmin Connect, else the one closest to the race distance (you can pick a different run). For three weeks the race result takes the countdown's place: finish time against Garmin's prediction going in, pace, heart rate, and your weekly kilometres over the 8 weeks before. **Past races** lists them all, including runs marked as races in Garmin that you never added, with your best time at each distance marked. Race days get a ring on the training calendar and a Race tag on the run page.
 
+Every run page has a **Race** switch: turn it on for a race Garmin doesn't know about, or off for a run Garmin marked by mistake. Stride keeps your choice over Garmin's mark, so it works for old runs too (a sync only re-fetches the last week, so changing an old run in Garmin Connect wouldn't reach Stride). Races then show in **Races in {year}** in the year in review.
+
+**Race card** on a race's page makes an image of the result: the finish time, pace, distance and heart rate, the route, your name, and your own photos of the medal and bib. Stride cuts the medal out of its background and pins the bib up like paper (drag and zoom to frame it); with no bib photo, a plain bib is printed with your number. It's all drawn in the browser, so the photos never leave your phone. The cut-out uses [`@imgly/background-removal`](https://github.com/imgly/background-removal-js) (AGPL-3.0): the first time downloads its model, about 40 MB, which the browser then keeps.
+
 ## Share cards
 
 **Share run** on a run's page and **Share this week** under the weekly summary make an image in the watch-face style: the distance huge and condensed, then time, pace, heart rate and climb (or, for a week, a bar for each day). Pick **Story** (1080×1920) or **Square** (1080×1080), then **Share** opens the phone's share sheet, or **Download** saves the PNG. A run's story card can draw the route shape; that's off by default, since a route often starts at home.
 
-Images come from `/api/card/run/{id}` and `/api/card/week/{date}`, rendered with `ImageResponse`. It can't use variable fonts, so fixed Archivo instances live in `assets/fonts` (SIL Open Font License).
+Images come from `/api/card/run/{id}` and `/api/card/week/{date}`, rendered with `ImageResponse`. It can't use variable fonts, so fixed Archivo instances live in `public/fonts` (SIL Open Font License); the race card, drawn in the browser, loads the same files.
 
 ## Export
 
@@ -111,10 +115,12 @@ lib/garmin/store.ts        Stored daily history: sync, backfill, store + live re
 lib/export.ts              CSV for runs and daily readings
 lib/review.ts              Year in review: monthly splits, highlights, body changes
 lib/energy.ts              Active calories this week and month, and food servings
-lib/races.ts               Races: goals matched to their runs, results, build-up, bests
+lib/races.ts               Races: goals matched to their runs, race marks, results, build-up, bests
+lib/race-data.ts           All races for a source (settings + stored history), for the run page, review and export
+lib/race-card-draw.ts      Race card on a canvas: medal cut-out, bib, route, result
 lib/card.tsx               Share card layouts (run, week; story, square)
 app/api/card/[kind]/[id]   Share card images
-components/share/          Share panel: preview, size, route, share or download
+components/share/          Share panel (preview, size, route, share or download) and the race card
 app/review/[year]          Year in review page (demo: app/demo/review/[year])
 app/api/export/[kind]      CSV downloads (account menu)
 app/api/sync/route.ts      Daily cron sync (CRON_SECRET)
@@ -127,7 +133,7 @@ lib/garmin/map.ts          Connect activity → Run mapping
 lib/garmin/weather.ts      Per-run weather from Garmin (°F/mph → metric)
 lib/trends.ts              Date ranges, weekly bucketing, training load
 lib/insights.ts            Weekly summary, sleep vs performance, recovery check, goals, race plan
-lib/settings.ts            Distance goals and races, in the key-value store
+lib/settings.ts            Distance goals, races and race marks, in the key-value store
 lib/garmin/demo.ts         Demo data
 lib/garmin/index.ts        getGarminDashboard(): cached live data
 lib/format.ts              Units, pace, durations, running totals

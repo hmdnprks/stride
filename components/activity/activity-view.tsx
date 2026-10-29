@@ -1,9 +1,12 @@
 import Link from "next/link";
-import type { ActivityDetail, RunWeather, Split } from "@/lib/garmin/types";
+import type { ActivityDetail, DataSource, RunWeather, Split } from "@/lib/garmin/types";
+import { distanceLabel, distanceName, versusPrediction, type FinishedRace } from "@/lib/races";
 import { weatherLine } from "@/lib/garmin/weather";
 import { clock, hm, km, pace, paceOf, parseLocal } from "@/lib/format";
 import { ThemeToggle } from "../uselayouts/theme-toggle";
 import { ShareCard } from "../share/share-card";
+import { RaceCard } from "../share/race-card";
+import { RaceToggle } from "./race-toggle";
 import { RouteMap } from "./route-map";
 import { SampleCharts } from "./sample-charts";
 
@@ -89,8 +92,20 @@ function SplitsTable({ splits }: { splits: Split[] }) {
   );
 }
 
-export function ActivityView({ detail, backHref }: { detail: ActivityDetail; backHref: string }) {
+export function ActivityView({
+  detail,
+  backHref,
+  source,
+  race,
+}: {
+  detail: ActivityDetail;
+  backHref: string;
+  source: DataSource;
+  /** The race this run was, if it counts as one. */
+  race: FinishedRace | null;
+}) {
   const { run } = detail;
+  const date = run.startLocal.slice(0, 10);
   const when = parseLocal(run.startLocal).toLocaleString("en-GB", {
     weekday: "long",
     day: "numeric",
@@ -116,15 +131,37 @@ export function ActivityView({ detail, backHref }: { detail: ActivityDetail; bac
         <header className="flex flex-col gap-3">
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-muted-foreground">
             {when}
-            {run.race && <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground">Race</span>}
+            {race && <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground">Race</span>}
           </p>
           <h1 className="wide text-2xl leading-[1.05] font-bold sm:text-3xl">{run.name}</h1>
-          <ShareCard
-            src={`/api/card/run/${run.id}${backHref.startsWith("/demo") ? "?source=demo" : ""}`}
-            filename={`stride-run-${run.startLocal.slice(0, 10)}`}
-            label="Share run"
-            routeOption={detail.route.length > 1}
-          />
+          {race && race.name !== run.name && <p className="-mt-1 text-base font-semibold">{race.name}</p>}
+          <div className="mt-2 flex flex-wrap items-start gap-x-3 gap-y-4 [&>*:has([aria-expanded=true])]:basis-full">
+            {race && (
+              <RaceCard
+                runId={run.id}
+                filename={`stride-race-${date}`}
+                data={{
+                  name: race.name,
+                  distanceName: distanceName(race.distanceKm),
+                  date,
+                  distanceKm: km(run.distanceM, 2),
+                  time: clock(run.durationSec),
+                  pace: pace(paceOf(run)),
+                  bestAt: race.best ? distanceLabel(race.distanceKm) : null,
+                  versus: versusPrediction(race),
+                  avgHr: run.avgHr,
+                  route: detail.route,
+                }}
+              />
+            )}
+            <ShareCard
+              src={`/api/card/run/${run.id}${source === "demo" ? "?source=demo" : ""}`}
+              filename={`stride-run-${date}`}
+              label="Share run"
+              routeOption={detail.route.length > 1}
+            />
+          </div>
+          <RaceToggle source={source} runId={run.id} race={!!race} garminRace={!!run.race} goal={!!race?.goal} />
         </header>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-4">

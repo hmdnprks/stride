@@ -316,4 +316,6 @@ export interface StrideSettings {
   yearKm: number | null;
   /** Every race set in Stride, past and upcoming. */
   races: RaceGoal[];
+  /** Runs marked in Stride as a race (true) or not a race (false), over Garmin's mark. By run id. */
+  raceMarks: Record<string, boolean>;
 }

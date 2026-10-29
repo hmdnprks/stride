@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   // The share cards read their fonts from disk; make sure they ship with the route.
   outputFileTracingIncludes: {
-    "/api/card/[kind]/[id]": ["./assets/fonts/*.ttf"],
+    "/api/card/[kind]/[id]": ["./public/fonts/*.ttf"],
   },
   experimental: {
     // Offline detection (the header's "Offline" state) and automatic retry

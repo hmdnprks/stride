@@ -4,24 +4,14 @@ import Link from "next/link";
 import { useTransition } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
-import { pickRaceRunAction, removeRaceAction } from "@/app/actions";
+import { markRaceAction, pickRaceRunAction, removeRaceAction } from "@/app/actions";
 import type { DataSource } from "@/lib/garmin/types";
 import { clock, pace, shortDate } from "@/lib/format";
-import { BUILD_WEEKS, distanceLabel, type FinishedRace } from "@/lib/races";
+import { BUILD_WEEKS, distanceLabel, versusPrediction, type FinishedRace } from "@/lib/races";
 import { cn } from "@/lib/utils";
 
 export const runHref = (source: DataSource, id: string) => (source === "demo" ? `/demo/runs/${id}` : `/runs/${id}`);
 const fullDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-
-/** "3:12 faster than Garmin predicted", or null when there's nothing fair to compare. */
-export function versusPrediction(race: FinishedRace) {
-  if (!race.run || !race.predictedSec) return null;
-  // A run well off the race distance (picked by hand) isn't comparable.
-  if (Math.abs(race.run.distanceKm - race.distanceKm) / race.distanceKm > 0.1) return null;
-  const diff = race.run.durationSec - race.predictedSec;
-  if (Math.abs(diff) < 5) return "Right on Garmin's prediction";
-  return `${clock(Math.abs(diff))} ${diff < 0 ? "faster" : "slower"} than Garmin predicted`;
-}
 
 /** Kilometres in each of the weeks before the race, race week last. */
 export function BuildUp({ race, tone = "default" }: { race: FinishedRace; tone?: "default" | "panel" }) {
@@ -131,9 +121,24 @@ function RaceRow({ source, race }: { source: DataSource; race: FinishedRace }) {
           <RunPicker source={source} race={race} />
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             {race.run && (
-              <Link href={runHref(source, race.run.id)} className="font-semibold text-primary underline-offset-4 hover:underline">
-                View the run
-              </Link>
+              <>
+                <Link href={`${runHref(source, race.run.id)}#race-card`} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  Make a race card
+                </Link>
+                <Link href={runHref(source, race.run.id)} className="font-semibold text-primary underline-offset-4 hover:underline">
+                  View the run
+                </Link>
+              </>
+            )}
+            {race.run && !race.goal && (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => start(() => markRaceAction(source, race.run!.id, false))}
+                className="text-muted-foreground hover:text-foreground disabled:opacity-60"
+              >
+                Not a race
+              </button>
             )}
             {race.goal && (
               <button
@@ -164,7 +169,7 @@ export function PastRaces({ source, races }: { source: DataSource; races: Finish
         </ul>
       ) : (
         <p className="max-w-[64ch] text-sm text-muted-foreground">
-          Races you add here, or mark as a race in Garmin Connect, show up after race day with your time and how your training went.
+          Races you add here, or mark as a race on a run&apos;s page or in Garmin Connect, show up after race day with your time and how your training went.
         </p>
       )}
     </section>
