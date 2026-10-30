@@ -181,3 +181,8 @@ export function buildRaces(goals: RaceGoal[], allRuns: Run[], daily: DailyRaw[],
     past: past.sort((a, b) => b.date.localeCompare(a.date)),
   };
 }
+
+/** Run id → race name, for every finished race with a run. */
+export function raceNames(past: FinishedRace[]): Record<string, string> {
+  return Object.fromEntries(past.flatMap((r) => (r.run ? [[r.run.id, r.name]] : [])));
+}

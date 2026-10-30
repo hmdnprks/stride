@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { Dashboard, Run, RunningExtras, Sleep, Trends } from "@/lib/garmin";
+import type { Dashboard, RunningExtras, Sleep, Trends } from "@/lib/garmin";
 import type { heatPerformance, recoveryCheck, sleepPerformance, weeklySummary } from "@/lib/insights";
 import { closestFood, servings, servingsLabel, type energyBurned } from "@/lib/energy";
 import { HRV_INFO } from "@/lib/glossary";
@@ -10,6 +10,7 @@ import { Sparkline } from "../charts/sparkline";
 import { FavouriteIcon, FireIcon, Moon02Icon, PulseRectangle01Icon } from "@hugeicons/core-free-icons";
 import { WatchFace } from "../watch-face";
 import { BodyBattery } from "./body-battery";
+import { RunRow } from "./run-row";
 import { EnergyBurned } from "./energy";
 import { HeatPerformance, RecoveryCheck, SleepPerformance, WeeklySummary } from "./insights";
 import { PersonalRecords, ShoeMileage } from "./records";
@@ -415,29 +416,6 @@ export function FitnessView({
 
 /* Runs */
 
-function RunRow({ run, href }: { run: Run; href: string }) {
-  return (
-    <li className="border-b border-border">
-      <Link
-        href={href}
-        className="group -mx-3 grid grid-cols-[1fr_auto] items-baseline gap-x-6 gap-y-1 rounded-xl px-3 py-4 transition-colors hover:bg-muted md:grid-cols-[8rem_1fr_7rem_6rem_6rem_4rem]"
-      >
-        <span className="order-2 text-sm text-muted-foreground md:order-none">{shortDate(run.startLocal)}</span>
-        <span className="order-1 font-semibold underline-offset-4 group-hover:underline md:order-none">{run.name}</span>
-        <span className="order-1 text-right md:order-none">
-          <span className="num text-[2.375rem] font-semibold">{km(run.distanceM, 2)}</span>
-          <span className="ml-1 text-sm text-muted-foreground">km</span>
-        </span>
-        <span className="order-3 col-span-2 flex gap-4 text-sm tabular-nums md:order-none md:col-span-3 md:grid md:grid-cols-[6rem_6rem_4rem] md:text-right md:text-base">
-          <span>{clock(run.durationSec)}</span>
-          <span className="font-semibold text-primary">{pace(paceOf(run))} /km</span>
-          <span className="text-muted-foreground">{run.avgHr ? `${run.avgHr} bpm` : ""}</span>
-        </span>
-      </Link>
-    </li>
-  );
-}
-
 export function RunsView({
   data,
   trends,
@@ -482,11 +460,19 @@ export function RunsView({
       <section className="flex flex-col gap-4">
         <Heading>Recent runs</Heading>
         {data.runs.length ? (
-          <ul>
-            {data.runs.slice(0, 12).map((r) => (
-              <RunRow key={r.id} run={r} href={runHref(r.id)} />
-            ))}
-          </ul>
+          <>
+            <ul>
+              {data.runs.slice(0, 12).map((r) => (
+                <RunRow key={r.id} run={r} href={runHref(r.id)} />
+              ))}
+            </ul>
+            <Link
+              href={`${data.source === "demo" ? "/demo" : ""}/runs`}
+              className="self-start text-sm font-semibold text-primary underline-offset-4 hover:underline"
+            >
+              See all runs
+            </Link>
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">No runs found. Record a run on your watch and sync it.</p>
         )}

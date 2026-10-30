@@ -368,12 +368,14 @@ export function getDemoActivity(id: string): ActivityDetail | null {
   });
 
   // A loop with a little character: wider east–west, a kink on one side.
+  // Centred on central Jakarta (Senayan) so the map has streets under it.
+  const [lat0, lon0] = [-6.2183, 106.8016];
   const route: [number, number][] = Array.from({ length: 160 }, (_, i) => {
     const t = (i / 159) * Math.PI * 2;
     const r = 0.012 * Math.sqrt(km / 8);
     return [
-      Math.round((r * Math.sin(t) * (1 + 0.15 * Math.sin(3 * t))) * 1e6) / 1e6,
-      Math.round((1.5 * r * Math.cos(t) + 0.004 * Math.sin(5 * t)) * 1e6) / 1e6,
+      Math.round((lat0 + r * Math.sin(t) * (1 + 0.15 * Math.sin(3 * t))) * 1e6) / 1e6,
+      Math.round((lon0 + 1.5 * r * Math.cos(t) + 0.004 * Math.sin(5 * t)) * 1e6) / 1e6,
     ];
   });
 

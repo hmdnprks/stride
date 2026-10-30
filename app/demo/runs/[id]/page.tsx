@@ -18,7 +18,7 @@ async function Activity({ params }: { params: PageProps<"/demo/runs/[id]">["para
   if (!detail) notFound();
   const { races } = await getRaces("demo");
   const race = races.past.find((r) => r.run?.id === detail.run.id) ?? null;
-  return <ActivityView detail={detail} backHref="/demo#runs" source="demo" race={race} />;
+  return <ActivityView detail={detail} backHref="/demo/runs" source="demo" race={race} />;
 }
 
 export default function DemoRunPage({ params }: PageProps<"/demo/runs/[id]">) {

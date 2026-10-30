@@ -18,7 +18,7 @@ async function Activity({ params }: { params: PageProps<"/runs/[id]">["params"] 
   if (!detail) notFound();
   const { races } = await getRaces("garmin");
   const race = races.past.find((r) => r.run?.id === detail.run.id) ?? null;
-  return <ActivityView detail={detail} backHref="/#runs" source="garmin" race={race} />;
+  return <ActivityView detail={detail} backHref="/runs" source="garmin" race={race} />;
 }
 
 export default function RunPage({ params }: PageProps<"/runs/[id]">) {

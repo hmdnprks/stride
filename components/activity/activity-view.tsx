@@ -194,7 +194,7 @@ export function ActivityView({
         <div className="grid gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <section className="flex flex-col gap-4">
             <h2 className="wide text-lg font-semibold">Route</h2>
-            <RouteMap route={detail.route} samples={detail.samples} distanceM={run.distanceM} />
+            <RouteMap route={detail.route} />
           </section>
           <section className="flex min-w-0 flex-col gap-4">
             <h2 className="wide text-lg font-semibold">Along the run</h2>

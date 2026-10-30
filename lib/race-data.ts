@@ -14,5 +14,5 @@ export async function getRaces(source: DataSource, today = isoDate(new Date())) 
   const races = history
     ? buildRaces(settings.races, history.runs, history.daily, today, settings.raceMarks)
     : { upcoming: [], past: [] };
-  return { races, marks: settings.raceMarks };
+  return { races, marks: settings.raceMarks, runs: history?.runs ?? [] };
 }

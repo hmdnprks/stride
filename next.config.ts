@@ -4,9 +4,11 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
-  // The share cards read their fonts from disk; make sure they ship with the route.
+  // Files read from disk at request time; make sure they ship with their routes.
   outputFileTracingIncludes: {
     "/api/card/[kind]/[id]": ["./public/fonts/*.ttf"],
+    // The map's worker is read from the package at request time.
+    "/maplibre-worker": ["./node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs"],
   },
   experimental: {
     // Offline detection (the header's "Offline" state) and automatic retry

@@ -42,7 +42,7 @@ Follow-ups:
 Follow-ups:
 
 - [ ] Verify against a real account: personal-record type IDs for half and marathon, race-predictor history, gear endpoints
-- [ ] Optional basemap under the route (needs a tile provider; currently the shape is drawn without one to keep GPS tracks private)
+- [x] Basemap under the route: MapLibre with OpenFreeMap's free OpenStreetMap tiles, replacing the 3D wall model
 
 ## ✅ Phase 4 — Insights (shipped)
 

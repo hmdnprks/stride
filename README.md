@@ -58,7 +58,7 @@ Each day's calories (total, active and resting) come from Garmin's calorie repor
 
 The Goals tab keeps every race, not just the next one. Add as many as you like; the soonest gets the countdown and taper plan. After race day, Stride finds the run that was the race: one on that day you marked as a race in Garmin Connect, else the one closest to the race distance (you can pick a different run). For three weeks the race result takes the countdown's place: finish time against Garmin's prediction going in, pace, heart rate, and your weekly kilometres over the 8 weeks before. **Past races** lists them all, including runs marked as races in Garmin that you never added, with your best time at each distance marked. Race days get a ring on the training calendar and a Race tag on the run page.
 
-Every run page has a **Race** switch: turn it on for a race Garmin doesn't know about, or off for a run Garmin marked by mistake. Stride keeps your choice over Garmin's mark, so it works for old runs too (a sync only re-fetches the last week, so changing an old run in Garmin Connect wouldn't reach Stride). Races then show in **Races in {year}** in the year in review.
+**See all runs** under Recent runs opens every stored run, newest first and grouped by month, with races marked; filter to races or to runs near 5K, 10K, half or marathon distance. Every run page has a **Race** switch: turn it on for a race Garmin doesn't know about, or off for a run Garmin marked by mistake. Stride keeps your choice over Garmin's mark, so it works for old runs too (a sync only re-fetches the last week, so changing an old run in Garmin Connect wouldn't reach Stride). Races then show in **Races in {year}** in the year in review.
 
 **Race card** on a race's page makes an image of the result: the finish time, pace, distance and heart rate, the route, your name, and your own photos of the medal and bib. Stride cuts the medal out of its background and pins the bib up like paper (drag and zoom to frame it); with no bib photo, a plain bib is printed with your number. It's all drawn in the browser, so the photos never leave your phone. The cut-out uses [`@imgly/background-removal`](https://github.com/imgly/background-removal-js) (AGPL-3.0): the first time downloads its model, about 40 MB, which the browser then keeps.
 
@@ -88,7 +88,7 @@ Watch-face direction: the Today view is a scaled-up four-field data screen, like
 - **Weight encodes value:** Body battery and sleep score get heavier as they rise (`components/stat-number.tsx`).
 - **Colour:** black, white, track blue `#1F47F5`, pale lane blue. Dark mode uses deep navy. Tokens live in `app/globals.css` under shadcn names.
 - **Charts:** hand-built SVG in `components/charts/`, following the dataviz skill: one axis per chart, a hover and arrow-key tooltip, a table view under every chart, colours checked with its palette validator (sleep stages use a validated ordinal blue ramp).
-- **Route:** each run's route is a solid wall on the blue panel, like a circuit model (three.js, loaded only on the run page). Its top follows elevation, exaggerated 10× and capped so hilly runs stay readable; with no elevation it's level. A navy block marks the start; drag or use the arrow keys to turn it. No basemap, so GPS tracks stay off tile servers.
+- **Route:** each run's route is drawn on a real map: [MapLibre GL](https://maplibre.org) (loaded only on the run page) with [OpenFreeMap](https://openfreemap.org)'s free vector tiles from OpenStreetMap data, no API key. A light map in light mode and a dark one in dark mode; the route is a track-blue line, the start a filled dot and the finish a ring. Scrolling the page past it doesn't zoom it (Ctrl/⌘ and scroll, pinch, or the buttons do). Until it loads, or without WebGL, the route's shape is drawn on the blue panel instead. Showing the map means OpenFreeMap's servers see which map tiles are requested, so roughly where a run was (not the GPS track itself, which is drawn in the browser). MapLibre's worker is served by `app/maplibre-worker/route.ts`.
 - **Mark:** a running track whose outer lane is drawn like a lap in progress, white on track blue (`lib/brand.ts`, copied into `app/icon.svg` and `public/offline.html`).
 - **Components:** from [uselayouts](https://uselayouts.com), installed via the shadcn registry (`@uselayouts/...`, see `components.json`) and adapted in `components/uselayouts/`: discrete tabs (view switcher), save button (Sync and Sign in states), smooth dropdown (account menu), theme toggle. Numbers animate with NumberFlow.
 
@@ -98,12 +98,12 @@ Watch-face direction: the Today view is a scaled-up four-field data screen, like
 app/page.tsx               Live dashboard (redirects to /login when not connected)
 app/login/page.tsx         Sign-in page
 app/demo/page.tsx          Dashboard on demo data
+app/runs/page.tsx          All stored runs by month, filterable (demo: app/demo/runs)
 app/runs/[id]/page.tsx     One run in detail (demo: app/demo/runs/[id])
 app/actions.ts             Sign-in, verification code, sync and sign-out server actions
 components/dashboard/      Frame (header, tabs, range picker), views, trends, insights, goals
 components/charts/         TrendChart, PaceHrChart, CalendarHeatmap, Sparkline, RangePicker
-components/activity/       Run detail: 3D route model, per-sample charts, splits
-lib/route-3d.ts            Route → solid wall model (resampling, elevation by distance)
+components/activity/       Run detail: route map, per-sample charts, splits
 components/watch-face.tsx  The four-field data screen
 components/stat-number.tsx Weight-encoded animated figures
 components/uselayouts/     Adapted uselayouts components
