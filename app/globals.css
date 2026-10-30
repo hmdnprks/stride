@@ -27,7 +27,7 @@
   --lane: #dce3f5;
   --panel: #1f47f5;
   --panel-foreground: #ffffff;
-  --panel-muted: #b9c7ff;
+  --panel-muted: #d0d9ff;
   --panel-line: rgb(255 255 255 / 0.22);
   --deep: #0a1b5c;
   /* Charts — validated with the dataviz skill's validate_palette.js. */
@@ -61,7 +61,7 @@
   --lane: #1a2a55;
   --panel: #1a3ad6;
   --panel-foreground: #ffffff;
-  --panel-muted: #aebcff;
+  --panel-muted: #bccaff;
   --panel-line: rgb(255 255 255 / 0.2);
   --deep: #c9d5ff;
   --series: #6a88ff;
@@ -146,6 +146,19 @@ body {
 @keyframes charge {
   from {
     font-weight: 150;
+  }
+}
+
+/* Today: the body battery fills up once, alongside the figures charging. */
+.battery-fill {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: battery-fill 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.15s backwards;
+}
+
+@keyframes battery-fill {
+  from {
+    transform: scaleX(0);
   }
 }
 

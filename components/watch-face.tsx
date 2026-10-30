@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { Sparkline } from "./charts/sparkline";
 import { StatNumber } from "./stat-number";
 import { InfoTip } from "./info-tip";
@@ -14,6 +15,7 @@ export interface WatchField {
   trend?: (number | null)[];
   /** What the figure means, in a tooltip by the label. */
   info?: string;
+  icon?: IconSvgElement;
 }
 
 /**
@@ -32,7 +34,12 @@ export function WatchFace({ fields }: { fields: [WatchField, WatchField, WatchFi
             i > 1 ? "border-t border-panel-line" : "",
           ].join(" ")}
         >
-          <span className="flex items-center gap-1.5 text-sm font-medium text-panel-muted sm:text-base">
+          <span className="flex items-center gap-2 text-sm font-medium text-panel-muted sm:text-base">
+            {f.icon && (
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-panel-foreground/12 text-panel-foreground">
+                <HugeiconsIcon icon={f.icon} size={18} strokeWidth={1.8} aria-hidden />
+              </span>
+            )}
             {f.label}
             {f.info && <InfoTip label={f.label}>{f.info}</InfoTip>}
           </span>

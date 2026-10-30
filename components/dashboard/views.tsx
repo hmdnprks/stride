@@ -7,7 +7,9 @@ import { HRV_INFO } from "@/lib/glossary";
 import { clock, hm, km, pace, paceOf, runningTotals, shortDate } from "@/lib/format";
 import { CalendarHeatmap } from "../charts/calendar-heatmap";
 import { Sparkline } from "../charts/sparkline";
+import { FavouriteIcon, FireIcon, Moon02Icon, PulseRectangle01Icon } from "@hugeicons/core-free-icons";
 import { WatchFace } from "../watch-face";
+import { BodyBattery } from "./body-battery";
 import { EnergyBurned } from "./energy";
 import { HeatPerformance, RecoveryCheck, SleepPerformance, WeeklySummary } from "./insights";
 import { PersonalRecords, ShoeMileage } from "./records";
@@ -58,22 +60,6 @@ function readiness({ bodyBattery, sleep }: Dashboard) {
   if (bb >= 70 && (sleep?.score ?? 100) >= 75) return { headline: "Ready for a quality session.", detail };
   if (bb >= 40) return { headline: "Good for an easy aerobic run.", detail };
   return { headline: "Take it easy today.", detail };
-}
-
-function BatteryRange({ low, high, current }: { low: number; high: number; current: number }) {
-  return (
-    <div className="relative h-10" role="img" aria-label={`Body battery ranged from ${low} to ${high} today and is now ${current}`}>
-      <div className="absolute inset-x-0 top-4 h-2 rounded-full bg-lane" />
-      <div className="absolute top-4 h-2 rounded-full bg-primary/35" style={{ left: `${low}%`, width: `${high - low}%` }} />
-      <div className="absolute top-1 h-8 w-1 -translate-x-1/2 rounded-full bg-foreground" style={{ left: `${current}%` }} />
-      <span className="absolute top-full mt-1 text-xs text-muted-foreground tabular-nums" style={{ left: `${low}%` }}>
-        {low}
-      </span>
-      <span className="absolute top-full mt-1 text-xs text-muted-foreground tabular-nums" style={{ right: `${100 - high}%` }}>
-        {high}
-      </span>
-    </div>
-  );
 }
 
 /** What each stage is, in plain words, and its usual share of time asleep (adults, rough). */
@@ -169,7 +155,7 @@ function SleepStages({ sleep }: { sleep: Sleep }) {
 
 const kcal = (n: number) => n.toLocaleString("en-GB");
 
-/** Active calories burned so far today: from runs and from everything else. */
+/** Today's active calories (the figure is on the watch face), split into runs and everything else. */
 function ActiveToday({ energy }: { energy: ReturnType<typeof energyBurned>["today"] }) {
   const { active, running, runs, usual } = energy;
   if (active === null) return <p className="text-sm text-muted-foreground">No calories for today yet. Sync your watch and they&apos;ll appear.</p>;
@@ -182,11 +168,6 @@ function ActiveToday({ energy }: { energy: ReturnType<typeof energyBurned>["toda
   ];
   return (
     <div className="flex flex-col gap-4">
-      <p className="flex items-baseline gap-2">
-        <span className="num text-[4.5rem] leading-none font-bold sm:text-[5.5rem]">{kcal(active)}</span>
-        <span className="text-lg font-semibold">kcal</span>
-        <span className="text-sm text-muted-foreground">so far</span>
-      </p>
       {active > 0 && (
         <div className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-lane">
           {parts.map((p) => p.kcal > 0 && <div key={p.label} className={p.color} style={{ width: `${(p.kcal / Math.max(active, usual ?? 0)) * 100}%` }} />)}
@@ -235,13 +216,26 @@ export function TodayView({
   const { headline, detail } = readiness(data);
   const date = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
 
+  const kcalTrend = trends.points
+    .slice(-14)
+    .map((p) => (p.kcalRunning === null && p.kcalOtherActive === null ? null : (p.kcalRunning ?? 0) + (p.kcalOtherActive ?? 0)));
+  const kcalNote =
+    energy.active === null
+      ? "Not synced"
+      : [energy.runs && energy.running !== null ? `${kcal(energy.running)} from running` : null, energy.usual !== null ? `usual day ${kcal(energy.usual)}` : null]
+          .filter(Boolean)
+          .join(", ") || "So far today";
+
   return (
     <div className="flex flex-col gap-10">
-      <header className="flex max-w-3xl flex-col gap-3">
-        <p className="text-base text-muted-foreground">{date}</p>
-        <h1 className="wide text-2xl leading-[1.05] font-bold text-balance sm:text-3xl">{headline}</h1>
-        {detail && <p className="text-lg text-muted-foreground">{detail}</p>}
-      </header>
+      <div className="grid items-end gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,1fr)_auto]">
+        <header className="flex max-w-3xl flex-col gap-3">
+          <p className="text-base text-muted-foreground">{date}</p>
+          <h1 className="wide text-2xl leading-[1.05] font-bold text-balance sm:text-3xl">{headline}</h1>
+          {detail && <p className="text-lg text-muted-foreground">{detail}</p>}
+        </header>
+        <BodyBattery data={bb} />
+      </div>
 
       {recovery.level !== "ok" && <RecoveryCheck check={recovery} />}
 
@@ -249,27 +243,31 @@ export function TodayView({
         <WatchFace
           fields={[
             {
-              label: "Body battery",
-              value: bb?.current ?? null,
-              score: bb?.current,
-              note: bb ? `Low ${bb.low}, high ${bb.high}` : "Not synced",
-              trend: recent("bbHigh"),
-            },
-            {
               label: "Sleep score",
+              icon: Moon02Icon,
               value: sleep?.score ?? null,
               score: sleep?.score,
               note: sleep ? [hm(sleep.durationSec), sleep.qualifier?.toLowerCase()].filter(Boolean).join(", ") : "Not synced",
               trend: recent("sleepScore"),
             },
             {
+              label: "Active calories",
+              icon: FireIcon,
+              value: energy.active,
+              unit: "kcal",
+              note: kcalNote,
+              trend: kcalTrend,
+            },
+            {
               label: "Resting heart rate",
+              icon: FavouriteIcon,
               value: heart?.restingHr ?? null,
               unit: "bpm",
               trend: recent("restingHr"),
             },
             {
               label: "Overnight HRV",
+              icon: PulseRectangle01Icon,
               info: HRV_INFO,
               value: heart?.hrvLastNight ?? null,
               unit: "ms",
@@ -282,40 +280,19 @@ export function TodayView({
           ]}
         />
         <p className="text-sm text-muted-foreground">
-          Body battery and sleep score get heavier as they rise. Lines show the last {Math.min(14, trends.points.length)}{" "}
+          Sleep score and body battery get heavier as they rise. Lines show the last {Math.min(14, trends.points.length)}{" "}
           {trends.bucket === "week" ? "weeks" : "days"}.
         </p>
       </div>
 
       <div className="grid gap-12 md:grid-cols-2 md:gap-16">
         <section className="flex flex-col gap-6">
-          <Heading>Body battery through the day</Heading>
-          {bb ? (
-            <>
-              <BatteryRange low={bb.low} high={bb.high} current={bb.current} />
-              <dl className="mt-4 flex gap-10">
-                <div className="flex flex-col gap-1">
-                  <dt className="text-sm text-muted-foreground">Charged</dt>
-                  <dd className="num text-[3.25rem] font-semibold">+{bb.charged}</dd>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <dt className="text-sm text-muted-foreground">Drained</dt>
-                  <dd className="num text-[3.25rem] font-semibold">−{bb.drained}</dd>
-                </div>
-              </dl>
-            </>
-          ) : (
-            <Missing what="body battery data" />
-          )}
-        </section>
-
-        <section className="flex flex-col gap-6">
           <Heading>Last night&apos;s sleep</Heading>
           {sleep ? <SleepStages sleep={sleep} /> : <Missing what="sleep data" />}
         </section>
 
         <section className="flex flex-col gap-6">
-          <Heading>Active calories today</Heading>
+          <Heading>Where today&apos;s calories came from</Heading>
           <ActiveToday energy={energy} />
         </section>
       </div>
