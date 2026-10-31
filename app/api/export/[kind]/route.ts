@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: RouteContext<"/api/expor
   if (kind === "runs") {
     // The Race column follows Stride's races: Garmin's marks, Stride's own, and matched goals.
     const settings = await getSettings(demo ? "demo" : "garmin");
-    const races = new Set(buildRaces(settings.races, history.runs, history.daily, isoDate(new Date()), settings.raceMarks).past.map((r) => r.run?.id));
+    const races = new Set(buildRaces(settings.races, history.runs, history.daily, isoDate(new Date()), settings.raceMarks, settings.raceNames).past.map((r) => r.run?.id));
     body = runsCsv(history.runs.map((r) => ({ ...r, race: races.has(r.id) })), { garmin: !demo });
   } else {
     body = dailyCsv(history.daily);

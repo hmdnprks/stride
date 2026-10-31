@@ -129,7 +129,14 @@ export function applyRaceMarks(runs: Run[], marks: Record<string, boolean>) {
  * Upcoming and finished races. `runs` and `daily` should reach back
  * BUILD_WEEKS before the oldest race for its build-up and prediction.
  */
-export function buildRaces(goals: RaceGoal[], allRuns: Run[], daily: DailyRaw[], today = isoDate(new Date()), marks: Record<string, boolean> = {}): Races {
+export function buildRaces(
+  goals: RaceGoal[],
+  allRuns: Run[],
+  daily: DailyRaw[],
+  today = isoDate(new Date()),
+  marks: Record<string, boolean> = {},
+  names: Record<string, string> = {},
+): Races {
   const runs = applyRaceMarks(allRuns, marks);
   const notRace = new Set(Object.keys(marks).filter((id) => !marks[id]));
   const byDate = new Map(daily.map((d) => [d.date, d]));
@@ -165,7 +172,7 @@ export function buildRaces(goals: RaceGoal[], allRuns: Run[], daily: DailyRaw[],
   for (const run of runs) {
     if (!run.race || taken.has(run.id)) continue;
     const km = run.distanceM / 1000;
-    past.push(finish(run.id, null, run.name, dateOf(run), standardDistance(km)?.km ?? round1(km), run, false));
+    past.push(finish(run.id, null, names[run.id] || run.name, dateOf(run), standardDistance(km)?.km ?? round1(km), run, false));
   }
 
   // Best time per distance, among races with a run.

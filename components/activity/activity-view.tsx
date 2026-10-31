@@ -6,6 +6,7 @@ import { clock, hm, km, pace, paceOf, parseLocal } from "@/lib/format";
 import { ThemeToggle } from "../uselayouts/theme-toggle";
 import { ShareCard } from "../share/share-card";
 import { RaceCard } from "../share/race-card";
+import { RaceName } from "./race-name";
 import { RaceToggle } from "./race-toggle";
 import { RouteMap } from "./route-map";
 import { SampleCharts } from "./sample-charts";
@@ -162,6 +163,7 @@ export function ActivityView({
             />
           </div>
           <RaceToggle source={source} runId={run.id} race={!!race} garminRace={!!run.race} goal={!!race?.goal} />
+          {race && <RaceName source={source} runId={run.id} goalId={race.goal?.id ?? null} name={race.name} runName={run.name} />}
         </header>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-4">

@@ -34,7 +34,7 @@ export function Dashboard({
   const energy = energyBurned(daily, runs, today);
   const goals = goalProgress(extras.calendar, settings, today);
   const last28Km = runs.filter((r) => r.startLocal.slice(0, 10) > addDays(today, -28)).reduce((a, r) => a + r.distanceM, 0) / 1000;
-  const races = buildRaces(settings.races, history.runs, history.daily, today, settings.raceMarks);
+  const races = buildRaces(settings.races, history.runs, history.daily, today, settings.raceMarks, settings.raceNames);
   // Ring every race day on the calendar, Stride's marks and matched goals included.
   const raceDays = new Set(races.past.flatMap((r) => (r.run ? [r.run.startLocal.slice(0, 10)] : [])));
   const runningExtras = { ...extras, calendar: extras.calendar.map((d) => ({ ...d, race: raceDays.has(d.date) })) };

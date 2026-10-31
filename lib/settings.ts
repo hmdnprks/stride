@@ -9,7 +9,7 @@ import { kvGet, kvSet } from "./kv";
 // Goals and races, stored in the key-value store (a JSON file in
 // .stride/ during local development). Demo and live data keep separate settings.
 
-const EMPTY: StrideSettings = { monthKm: null, yearKm: null, races: [], raceMarks: {} };
+const EMPTY: StrideSettings = { monthKm: null, yearKm: null, races: [], raceMarks: {}, raceNames: {} };
 
 /** As saved: earlier versions kept a single `race` instead of the list. */
 type Saved = Partial<StrideSettings> & { race?: Omit<RaceGoal, "id"> | null };
@@ -39,6 +39,7 @@ function demoDefaults(): StrideSettings {
       { id: "demo-past", name: past.name, date: past.date, distanceKm: past.km },
     ],
     raceMarks: {},
+    raceNames: {},
   };
 }
 
@@ -69,6 +70,22 @@ export async function markRace(source: DataSource, runId: string, race: boolean 
   // A race picked for a goal by hand stops being its run once it's "not a race".
   const unpicked = race === false && races.some((r) => r.runId === runId);
   await saveSettings(source, { raceMarks: marks, ...(unpicked && { races: races.map((r) => (r.runId === runId ? { ...r, runId: null } : r)) }) });
+}
+
+/**
+ * Name a finished race: a goal race's own name, or for a race that's only a
+ * marked run, a name kept by run id. Empty goes back to the run's name.
+ */
+export async function nameRace(source: DataSource, runId: string, goalId: string | null, name: string) {
+  const { races, raceNames } = await getSettings(source);
+  if (goalId && races.some((r) => r.id === goalId)) {
+    if (name) await saveSettings(source, { races: races.map((r) => (r.id === goalId ? { ...r, name } : r)) });
+    return;
+  }
+  const names = { ...raceNames };
+  if (name) names[runId] = name;
+  else delete names[runId];
+  await saveSettings(source, { raceNames: names });
 }
 
 /** Change the race list; `change` gets the current list (demo defaults included). */

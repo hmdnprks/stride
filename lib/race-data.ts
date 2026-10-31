@@ -12,7 +12,7 @@ export async function getRaces(source: DataSource, today = isoDate(new Date())) 
     source === "demo" ? getDemoHistory(400) : getGarminAllHistory().catch(() => null),
   ]);
   const races = history
-    ? buildRaces(settings.races, history.runs, history.daily, today, settings.raceMarks)
+    ? buildRaces(settings.races, history.runs, history.daily, today, settings.raceMarks, settings.raceNames)
     : { upcoming: [], past: [] };
   return { races, marks: settings.raceMarks, runs: history?.runs ?? [] };
 }

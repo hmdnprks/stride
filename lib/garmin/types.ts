@@ -318,4 +318,6 @@ export interface StrideSettings {
   races: RaceGoal[];
   /** Runs marked in Stride as a race (true) or not a race (false), over Garmin's mark. By run id. */
   raceMarks: Record<string, boolean>;
+  /** Names given in Stride to races that aren't goals (marked in Garmin or Stride). By run id. */
+  raceNames: Record<string, string>;
 }

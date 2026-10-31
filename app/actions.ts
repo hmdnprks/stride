@@ -6,7 +6,7 @@ import { refresh, updateTag } from "next/cache";
 import { disconnect, signIn, verifyMfa, type SignInResult } from "@/lib/garmin/auth";
 import { clearHistory, GARMIN_CACHE_TAG, type DataSource } from "@/lib/garmin";
 import { assertUnlocked } from "@/lib/gate-server";
-import { markRace, saveSettings, updateRaces } from "@/lib/settings";
+import { markRace, nameRace, saveSettings, updateRaces } from "@/lib/settings";
 
 const MFA_COOKIE = "garmin_mfa";
 
@@ -149,5 +149,13 @@ export async function markRaceAction(source: DataSource, runId: string, race: bo
   await assertUnlocked();
   if (!/^[\w-]{1,40}$/.test(runId)) return;
   await markRace(sourceOf(source), runId, typeof race === "boolean" ? race : null);
+  refresh();
+}
+
+/** Name a finished race (a goal's name, or one kept for a marked run); empty goes back to the run's name. */
+export async function nameRaceAction(source: DataSource, runId: string, goalId: string | null, name: string) {
+  await assertUnlocked();
+  if (!/^[\w-]{1,40}$/.test(runId) || (goalId !== null && !/^[\w-]{1,40}$/.test(goalId))) return;
+  await nameRace(sourceOf(source), runId, goalId, String(name ?? "").trim().slice(0, 80));
   refresh();
 }
